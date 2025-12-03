@@ -48,8 +48,8 @@ with st.sidebar:
 
     st.header("3. S-Job Definition")
     st.caption("Cost Structure per $1 Revenue:")
-    sj_mat_pct = st.slider("Material Cost %", 0, 100, 50)
-    sj_lab_pct = st.slider("Labor Cost %", 0, 100, 30)
+    sj_mat_pct = st.slider("Material Cost %", 0, 100, 65)
+    sj_lab_pct = st.slider("Labor Cost %", 0, 100, 41)
     
     st.caption("Resource Split (Labor Portion):")
     c1, c2 = st.columns(2)
@@ -64,7 +64,7 @@ with st.sidebar:
     st.divider()
 
     st.header("4. The 'Real World' Costs")
-    attrition_rate = st.slider("Attrition Rate %", 0, 30, 10, help="% of staff who quit each year.")
+    attrition_rate = st.slider("Attrition Rate %", 0, 30, 7, help="% of staff who quit each year.")
     cost_per_hire = st.number_input("Cost per Hire ($)", value=12000, help="Recruiting + Tooling cost per new head.", format="%d")
     sales_trigger = st.number_input("Rev per Sales Rep ($)", value=3000000, format="%d")
     
@@ -370,4 +370,5 @@ with tab4:
     st.dataframe(format_df(df[cols_hire], fmt_hire), use_container_width=True)
 
     st.caption("Note: Hiring Fees are pro-rated to reflect that Service only pays for Tech/Manager acquisition costs.")
+
 
