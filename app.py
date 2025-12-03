@@ -73,7 +73,7 @@ with st.sidebar:
     st.header("5. Rates & Efficiency")
     # Costs
     cost_tech = st.number_input("Tech Cost ($/hr)", value=85, format="%d")
-    cost_eng = st.number_input("Engineer Cost ($/hr)", value=95, format="%d")
+    cost_eng = st.number_input("Engineer Cost ($/hr)", value=85, format="%d")
     # Billing
     bill_rate = st.number_input("T&M Bill Rate ($/hr)", value=210, format="%d")
     utilization = st.slider("T&M Utilization (%)", 40, 100, 80) / 100
@@ -368,4 +368,5 @@ with tab4:
     }
     
     st.dataframe(format_df(df[cols_hire], fmt_hire), use_container_width=True)
+
     st.caption("Note: Hiring Fees are pro-rated to reflect that Service only pays for Tech/Manager acquisition costs.")
