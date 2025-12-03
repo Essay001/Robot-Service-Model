@@ -83,8 +83,8 @@ with st.sidebar:
     
     st.header("6. Operational Overhead")
     techs_per_loc = st.number_input("Max Techs per Loc", value=6, format="%d")
-    rent_cost = st.number_input("Rent ($/mo)", value=5000, format="%d")
-    central_cost = st.number_input("Central Support ($/mo)", value=8000, format="%d")
+    rent_cost = st.number_input("Rent ($/mo)", value=0, format="%d")
+    central_cost = st.number_input("Central Support ($/mo)", value=0, format="%d")
     inflation = st.slider("Inflation %", 0, 10, 3) / 100
 
 # ==========================================
@@ -370,3 +370,4 @@ with tab4:
     st.dataframe(format_df(df[cols_hire], fmt_hire), use_container_width=True)
 
     st.caption("Note: Hiring Fees are pro-rated to reflect that Service only pays for Tech/Manager acquisition costs.")
+
