@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 
 # --- PAGE CONFIGURATION ---
-st.set_page_config(page_title="2029 Exit Strategy Model", layout="wide")
+st.set_page_config(page_title="2029 Strategic Exit Model", layout="wide")
 
 st.markdown("""
 <style>
@@ -14,81 +14,91 @@ st.markdown("""
     .miss-box {background-color: #ffebee; padding: 20px; border-radius: 10px; border-left: 10px solid #c62828; text-align: center;}
     .metric-label {font-size: 14px; color: #555;}
     .metric-value {font-size: 26px; font-weight: bold;}
+    .audit-box {background-color: #fff8e1; padding: 15px; border-radius: 5px; border-left: 5px solid #ffc107; font-size: 14px; margin-top: 10px;}
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🚀 2029 Exit Strategy: Strategic Planner")
-st.markdown("Model the path to **$7.5M Revenue**. Control **Labor**, **Job Parts**, **Pure Spares**, and **Projects** separately.")
+st.title("🚀 2029 Strategic Exit Model")
+st.markdown("The complete business plan: **4-Stream Revenue**, **Resource Loading**, **Attrition**, and **Audit Trails**.")
 
 # ==========================================
-# 1. SIDEBAR: REVENUE STREAMS
+# 1. SIDEBAR: THE CONTROL TOWER
 # ==========================================
 
 with st.sidebar:
     st.header("1. The Exit Goal")
-    exit_target = st.number_input("2029 Revenue Target ($)", value=7500000, step=250000)
-    
+    exit_target = st.number_input("2029 Revenue Target ($)", value=7500000, step=250000, format="%d")
+
     st.divider()
-    
-    st.header("2. Revenue Stream A: Service Labor")
-    tm_labor_base = st.number_input("Year 1 Labor Rev ($)", value=2000000, step=100000, help="Revenue from HOURS only.")
+
+    st.header("2. Revenue Stream A: Labor")
+    st.caption("Revenue generated strictly by billing hours.")
+    tm_labor_base = st.number_input("Year 1 Labor Rev ($)", value=2000000, step=100000, format="%d")
     tm_growth = st.slider("Labor Growth %", 0, 100, 20)
-    bill_rate = st.number_input("Bill Rate ($/hr)", value=210)
+    bill_rate = st.number_input("Bill Rate ($/hr)", value=210, format="%d")
     utilization = st.slider("Tech Utilization %", 50, 100, 80) / 100
-    
+
     st.divider()
 
     st.header("3. Revenue Stream B: Job Parts")
-    st.info("Parts sold *during* a service call.")
-    # Input: Parts as % of Total Job? Or Parts relative to Labor?
-    # User said: "20-30% of overall revenue is parts".
-    # Let's use % of Ticket.
-    job_parts_pct = st.slider("Parts % of Service Ticket", 0, 50, 25, help="If 25%, then a $1000 invoice is $750 Labor / $250 Parts.")
+    st.caption("Parts attached to service tickets.")
+    # If Parts is 25% of the TOTAL ticket, then Labor is 75%.
+    job_parts_pct = st.slider("Parts % of Service Ticket", 0, 50, 25, help="Example: If 25%, then for every $750 of Labor, you sell $250 of Parts.")
     job_parts_margin = st.slider("Job Parts Margin %", 0, 100, 30)
 
     st.divider()
 
-    st.header("4. Revenue Stream C: S-Jobs (Projects)")
-    s_job_base = st.number_input("Year 1 S-Job Rev ($)", value=1000000, step=100000)
+    st.header("4. Revenue Stream C: S-Jobs")
+    st.caption("Fixed Bid Projects.")
+    s_job_base = st.number_input("Year 1 S-Job Rev ($)", value=1000000, step=100000, format="%d")
     s_job_growth = st.slider("S-Job Growth %", 0, 100, 15)
     
-    # S-Job definition
-    with st.expander("S-Job Cost Details"):
-        sj_mat_pct = st.slider("Material Cost %", 0, 100, 50)
-        sj_lab_pct = st.slider("Labor Cost %", 0, 100, 30)
-        st.caption("Resource Split:")
-        w_tech = st.number_input("Tech %", value=0.20)
-        w_me = st.number_input("ME %", value=0.40)
-        w_ce = st.number_input("CE %", value=0.20)
-        w_prog = st.number_input("Prog %", value=0.20)
+    with st.expander("S-Job Cost & Resources"):
+        sj_mat_pct = st.slider("S-Job Mat Cost %", 0, 100, 50)
+        sj_lab_pct = st.slider("S-Job Labor Cost %", 0, 100, 30)
+        st.caption("Resource Split (Labor Portion):")
+        c1, c2 = st.columns(2)
+        w_tech = c1.number_input("Tech %", value=20, format="%d")/100
+        w_me = c2.number_input("ME %", value=40, format="%d")/100
+        w_ce = c1.number_input("CE %", value=20, format="%d")/100
+        w_prog = c2.number_input("Prog %", value=20, format="%d")/100
 
     st.divider()
 
-    st.header("5. Revenue Stream D: Pure Spares")
-    st.info("Direct box sales (No labor attached).")
-    spares_base = st.number_input("Year 1 Spares Rev ($)", value=500000, step=50000)
+    st.header("5. Revenue Stream D: Spares")
+    st.caption("Pure Box Sales (No Labor).")
+    spares_base = st.number_input("Year 1 Spares Rev ($)", value=500000, step=50000, format="%d")
     spares_growth = st.slider("Spares Growth %", 0, 100, 10)
     spares_margin = st.slider("Spares Margin %", 0, 100, 35)
 
     st.divider()
-    
+
     st.header("6. Costs & Baseline")
-    with st.expander("Staff & OpEx Settings"):
-        base_techs = st.number_input("Existing Techs", value=2)
-        base_others = st.number_input("Existing Engineers", value=3)
-        cost_tech = st.number_input("Tech Cost ($/hr)", value=85)
-        cost_eng = st.number_input("Eng Cost ($/hr)", value=95)
-        techs_per_loc = st.number_input("Techs/Loc", value=6)
-        rent = st.number_input("Rent", value=5000)
+    with st.expander("Operational Details"):
+        st.caption("Baseline Staff (Already Hired):")
+        base_techs = st.number_input("Base Techs", value=2)
+        base_me = st.number_input("Base ME", value=1)
+        base_ce = st.number_input("Base CE", value=1)
+        base_prog = st.number_input("Base Prog", value=1)
+        
+        st.caption("Costs:")
+        cost_tech = st.number_input("Tech Cost ($/hr)", value=85, format="%d")
+        cost_eng = st.number_input("Eng Cost ($/hr)", value=95, format="%d")
+        rent = st.number_input("Rent ($/mo)", value=5000, format="%d")
+        central = st.number_input("Central Support ($/mo)", value=8000, format="%d")
+        
+        st.caption("Hiring & Sales:")
         attrition = st.slider("Attrition %", 0, 20, 10)
-        hire_cost = st.number_input("Hire Cost", value=12000)
+        hire_cost = st.number_input("Hire Cost ($)", value=12000, format="%d")
+        sales_trigger = st.number_input("Rev per Sales Rep", value=3000000, format="%d")
+        
         inflation = st.slider("Inflation %", 0, 10, 3) / 100
 
 # ==========================================
 # 2. LOGIC ENGINE
 # ==========================================
 
-def run_exit_model():
+def run_fusion_model():
     years = [2026, 2027, 2028, 2029]
     data = []
     
@@ -97,68 +107,92 @@ def run_exit_model():
     curr_sjob_target = s_job_base
     curr_spares_target = spares_base
     
-    # Baseline Staff
+    # Staff Trackers
     cum_techs = base_techs
-    cum_eng = base_others
-    prev_total_hc = base_techs + base_others
+    cum_me = base_me
+    cum_ce = base_ce
+    cum_prog = base_prog
+    
+    prev_total_hc = base_techs + base_me + base_ce + base_prog
     
     for i, year in enumerate(years):
         inf = (1 + inflation) ** i
         
-        # 1. Calculate Revenue Streams
+        # 1. INFLATED COSTS
+        c_tech_inf = cost_tech * inf
+        c_eng_inf = cost_eng * inf
+        c_bill_inf = bill_rate * inf
+        c_hire_inf = hire_cost * inf
+        c_rent_inf = rent * inf
+        
+        # 2. CALCULATE REVENUE STREAMS
         if i > 0:
             curr_labor_target = curr_labor_target * (1 + tm_growth/100)
             curr_sjob_target = curr_sjob_target * (1 + s_job_growth/100)
             curr_spares_target = curr_spares_target * (1 + spares_growth/100)
             
-        # 2. Calculate "Job Parts" (The Attach Rate)
-        # If Labor Rev is X, and Parts is Y% of TOTAL Ticket...
-        # Labor = Total * (1 - Y%)  ->  Total = Labor / (1 - Y%)
+        # Logic B: Job Parts (Attach Rate)
+        # Total Ticket = Labor / (1 - Parts%)
         # Parts = Total - Labor
         total_ticket_rev = curr_labor_target / (1 - (job_parts_pct/100))
         curr_job_parts_rev = total_ticket_rev - curr_labor_target
         
-        # 3. Total Revenue
+        # Total Top Line
         total_rev = curr_labor_target + curr_job_parts_rev + curr_sjob_target + curr_spares_target
         
-        # 4. Resource Requirements
-        # A. Techs for Labor Service
+        # 3. RESOURCE LOADING
+        # A. Techs for Service Labor
         # Capacity = 2080 * Util * BillRate
-        tech_capacity_labor_only = 2080 * utilization * (bill_rate * inf)
-        techs_for_service = math.ceil(curr_labor_target / tech_capacity_labor_only)
+        labor_capacity_per_tech = 2080 * utilization * c_bill_inf
+        techs_for_service = math.ceil(curr_labor_target / labor_capacity_per_tech)
         
         # B. Resources for S-Jobs
-        sj_labor_budget = curr_sjob_target * (sj_lab_pct/100)
-        sj_tech_fte = (sj_labor_budget * w_tech) / ((cost_tech*inf) * 2080)
-        sj_eng_fte = (sj_labor_budget * (w_me+w_ce+w_prog)) / ((cost_eng*inf) * 2080)
+        sj_labor_budget = curr_sjob_target * (sj_lab_pct / 100)
+        sj_tech_fte = (sj_labor_budget * w_tech) / (c_tech_inf * 2080)
+        sj_me_fte = (sj_labor_budget * w_me) / (c_eng_inf * 2080)
+        sj_ce_fte = (sj_labor_budget * w_ce) / (c_eng_inf * 2080)
+        sj_prog_fte = (sj_labor_budget * w_prog) / (c_eng_inf * 2080)
         
-        # C. Total Headcount Needed
+        # C. Total Headcount Requirements
         req_techs = math.ceil(techs_for_service + sj_tech_fte)
-        req_eng = math.ceil(sj_eng_fte) # Simplifying all eng to one bucket for high level
+        req_me = math.ceil(sj_me_fte)
+        req_ce = math.ceil(sj_ce_fte)
+        req_prog = math.ceil(sj_prog_fte)
         
-        # D. Hiring (Growth + Attrition)
-        # Growth
+        # 4. HIRING & ATTRITION
+        # Techs
         new_techs = max(0, req_techs - cum_techs)
         cum_techs = max(cum_techs, req_techs)
-        new_eng = max(0, req_eng - cum_eng)
-        cum_eng = max(cum_eng, req_eng)
+        # Eng
+        new_me = max(0, req_me - cum_me)
+        cum_me = max(cum_me, req_me)
+        new_ce = max(0, req_ce - cum_ce)
+        cum_ce = max(cum_ce, req_ce)
+        new_prog = max(0, req_prog - cum_prog)
+        cum_prog = max(cum_prog, req_prog)
         
-        # Attrition
+        growth_hires = new_techs + new_me + new_ce + new_prog
         attrition_count = math.ceil(prev_total_hc * (attrition/100))
-        total_hires = new_techs + new_eng + attrition_count
+        total_hires = growth_hires + attrition_count
         
-        curr_total_hc = cum_techs + cum_eng
+        curr_total_hc = cum_techs + cum_me + cum_ce + cum_prog
         prev_total_hc = curr_total_hc
         
-        # 5. Financials
+        # 5. OPERATIONS
+        locs = math.ceil(cum_techs / 6) # Hardcoded 6 per loc or variable
+        managers = math.ceil(cum_techs / 10)
+        sales_reps = math.floor(total_rev / sales_trigger)
+        
+        # 6. FINANCIALS
         
         # COGS
-        # Labor (Techs + Eng)
-        cogs_labor_tech = cum_techs * 2080 * (cost_tech * inf)
-        # Allocated Eng COGS (FTE based)
-        cogs_labor_eng = sj_eng_fte * 2080 * (cost_eng * inf)
+        # Labor: Service Techs (Full Headcount Cost)
+        cogs_labor_tech = cum_techs * 2080 * c_tech_inf
+        # Labor: Eng (Allocated FTE Cost)
+        total_eng_fte = sj_me_fte + sj_ce_fte + sj_prog_fte
+        cogs_labor_eng = total_eng_fte * 2080 * c_eng_inf
         
-        # Parts COGS
+        # Parts/Mat
         cogs_job_parts = curr_job_parts_rev * (1 - (job_parts_margin/100))
         cogs_spares = curr_spares_target * (1 - (spares_margin/100))
         cogs_sjob_mat = curr_sjob_target * (sj_mat_pct/100)
@@ -167,14 +201,16 @@ def run_exit_model():
         gross_profit = total_rev - total_cogs
         
         # OpEx
-        locs = math.ceil(cum_techs / techs_per_loc)
-        managers = math.ceil(cum_techs / 10)
-        
-        opex_rent = locs * (rent * inf) * 12
+        opex_rent = locs * c_rent_inf * 12
         opex_mgr = managers * (85000 * 1.2 * inf)
-        opex_hire = total_hires * (hire_cost * inf)
+        opex_sales = sales_reps * (120000 * inf)
+        opex_central = (central * 12 * inf) if locs > 1 else 0
         
-        total_opex = opex_rent + opex_mgr + opex_hire
+        # Hiring Cost (Pro-rated for Service Techs only? Or everyone? Let's do Everyone for realism)
+        opex_hire = total_hires * c_hire_inf
+        
+        total_opex = opex_rent + opex_mgr + opex_sales + opex_central + opex_hire
+        
         ebitda = gross_profit - total_opex
         
         data.append({
@@ -187,15 +223,23 @@ def run_exit_model():
             "EBITDA": ebitda,
             "EBITDA %": ebitda/total_rev,
             "Techs": cum_techs,
-            "Locations": locs
+            "MEs": cum_me,
+            "CEs": cum_ce,
+            "Progs": cum_prog,
+            "Eng FTE": total_eng_fte,
+            "Total Hires": total_hires,
+            "Locations": locs,
+            "OpEx: Hiring": opex_hire,
+            "Total COGS": total_cogs,
+            "Total OpEx": total_opex
         })
         
     return pd.DataFrame(data)
 
-df = run_exit_model()
+df = run_fusion_model()
 
 # ==========================================
-# 3. GOAL SEEK VISUALIZER
+# 3. GOAL SEEK DASHBOARD
 # ==========================================
 
 final_yr = df.iloc[-1]
@@ -205,6 +249,7 @@ gap = actual_2029 - exit_target
 c_goal, c_chart = st.columns([1, 2])
 
 with c_goal:
+    # GOAL BOX
     if gap >= 0:
         st.markdown(f"""
         <div class='goal-box'>
@@ -225,57 +270,80 @@ with c_goal:
         """, unsafe_allow_html=True)
         
     st.markdown("### 💡 Tech Revenue Reality")
-    # Calculate the Blended Tech Revenue
-    # Labor Capacity = 2080 * Util * BillRate
+    # Single Tech Capacity Math
     lab_cap = 2080 * utilization * bill_rate
-    # Total Ticket = Labor / (1 - Parts%)
-    tot_cap = lab_cap / (1 - (job_parts_pct/100))
-    parts_cap = tot_cap - lab_cap
+    # If Labor is 75% of Ticket (Parts 25%), Ticket = Labor / 0.75
+    ticket_cap = lab_cap / (1 - (job_parts_pct/100))
+    parts_cap = ticket_cap - lab_cap
     
-    st.write(f"**Labor Revenue:** ${lab_cap:,.0f}")
-    st.write(f"**+ Job Parts:** ${parts_cap:,.0f}")
-    st.markdown(f"**= Total per Tech:** :blue[**${tot_cap:,.0f}**]")
-    st.caption(f"This is the actual revenue 1 Tech generates at {utilization*100:.0f}% utilization.")
+    st.write(f"**Labor Rev:** ${lab_cap:,.0f}")
+    st.write(f"**+ Attached Parts:** ${parts_cap:,.0f}")
+    st.markdown(f"**= Total Tech Output:** :blue[**${ticket_cap:,.0f}**]")
 
 with c_chart:
-    st.subheader("Revenue Mix to $7.5M")
+    st.subheader("Revenue Path to Exit")
     fig, ax = plt.subplots(figsize=(10, 5))
     
-    # Stacked Bar
     years = df['Year']
-    p1 = ax.bar(years, df['Rev: Labor'], label='Service Labor', color='#1976d2')
+    # Stacked Bars
+    p1 = ax.bar(years, df['Rev: Labor'], label='Service Labor', color='#1565c0')
     p2 = ax.bar(years, df['Rev: Job Parts'], bottom=df['Rev: Labor'], label='Job Parts', color='#64b5f6')
-    p3 = ax.bar(years, df['Rev: S-Jobs'], bottom=df['Rev: Labor']+df['Rev: Job Parts'], label='S-Jobs', color='#ff9800')
-    p4 = ax.bar(years, df['Rev: Spares'], bottom=df['Rev: Labor']+df['Rev: Job Parts']+df['Rev: S-Jobs'], label='Pure Spares', color='#4caf50')
+    p3 = ax.bar(years, df['Rev: S-Jobs'], bottom=df['Rev: Labor']+df['Rev: Job Parts'], label='S-Jobs', color='#ffb74d')
+    p4 = ax.bar(years, df['Rev: Spares'], bottom=df['Rev: Labor']+df['Rev: Job Parts']+df['Rev: S-Jobs'], label='Pure Spares', color='#81c784')
     
     # Target Line
     ax.axhline(y=exit_target, color='red', linestyle='--', linewidth=2, label='Exit Target')
     
     ax.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
     ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    
     st.pyplot(fig)
 
 st.divider()
 
 # ==========================================
-# 4. DATA TABLES
+# 4. AUDIT CENTER (TABBED)
 # ==========================================
 
-st.subheader("Detailed Projections")
-view = df[['Year', 'Total Revenue', 'Rev: Labor', 'Rev: Job Parts', 'Rev: S-Jobs', 'Rev: Spares', 'EBITDA', 'EBITDA %']].copy()
+st.subheader("🔍 Audit Center")
 
-# Formatting
-for c in view.columns:
-    if "Rev" in c or "EBITDA" == c:
-        view[c] = view[c].apply(lambda x: f"${x:,.0f}")
-view['EBITDA %'] = view['EBITDA %'].apply(lambda x: f"{x*100:.1f}%")
+tab1, tab2, tab3 = st.tabs(["💰 P&L Detail", "👥 Headcount Path", "📊 Hiring & Ops"])
 
-st.dataframe(view, use_container_width=True)
+# Helper for formatting
+def format_df(d, m): return d.style.format(m)
 
-st.markdown("""
-### 🧠 How to use this to hit your number:
-1.  **Start with Labor:** Adjust `Year 1 Labor Rev` and `Labor Growth`. This is your engine.
-2.  **Adjust the Attach Rate:** Use `Parts % of Service Ticket`. Increasing this pumps up revenue without adding headcount (Techs just sell more parts per job).
-3.  **Layer S-Jobs & Spares:** These are your "layer cakes" on top.
-4.  **Watch the Goal Box:** Keep tweaking until the red box turns **Green**.
-""")
+with tab1:
+    st.markdown("### Detailed P&L")
+    cols = ['Year', 'Total Revenue', 'Rev: Labor', 'Rev: Job Parts', 'Rev: S-Jobs', 'Rev: Spares', 
+            'Total COGS', 'Total OpEx', 'EBITDA', 'EBITDA %']
+    
+    fmt = {'Year':'{:.0f}', 'EBITDA %':'{:.1f}%'}
+    for c in cols:
+        if c not in fmt: fmt[c] = "${:,.0f}"
+        
+    st.dataframe(format_df(df[cols], fmt), use_container_width=True)
+
+with tab2:
+    st.markdown("### Resource Path")
+    cols = ['Year', 'Techs', 'MEs', 'CEs', 'Progs', 'Locations']
+    
+    fmt = {'Year':'{:.0f}', 'Techs':'{:.0f}', 'MEs':'{:.0f}', 'CEs':'{:.0f}', 'Progs':'{:.0f}', 'Locations':'{:.0f}'}
+    
+    st.dataframe(format_df(df[cols], fmt), use_container_width=True)
+    st.info("Headcount is driven by the Revenue Targets set in the sidebar.")
+
+with tab3:
+    st.markdown("### Hiring & Operations")
+    cols = ['Year', 'Total Hires', 'OpEx: Hiring', 'Eng FTE']
+    
+    fmt = {'Year':'{:.0f}', 'Total Hires':'{:.0f}', 'OpEx: Hiring':'${:,.0f}', 'Eng FTE':'{:.2f}'}
+    
+    st.dataframe(format_df(df[cols], fmt), use_container_width=True)
+    st.markdown(f"""
+    <div class='audit-box'>
+    <b>Hiring Cost Logic:</b><br>
+    Includes <b>${hire_cost:,.0f}</b> cost per hire for both Growth and Attrition ({attrition}%).
+    </div>
+    """, unsafe_allow_html=True)
