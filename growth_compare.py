@@ -18,7 +18,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("⚖️ Talent Strategy: Green vs. Rebadge")
-st.markdown("Test the **Max Salary** theory. How much can we pay a Rebadge Tech before the model breaks?")
+st.markdown("Comparing **Standard Hiring** (Lower cost, slow ramp) vs. **Rebadging** (High cost, instant revenue).")
 
 # ==========================================
 # 1. SIDEBAR INPUTS
@@ -27,39 +27,32 @@ st.markdown("Test the **Max Salary** theory. How much can we pay a Rebadge Tech 
 with st.sidebar:
     st.header("1. Baseline")
     base_rev_2025 = st.number_input("2025 Start Revenue ($)", value=1500000, step=100000, format="%d")
-    base_growth_pct = st.slider("Base Biz Organic Growth %", 0, 20, 5, help="Growth of existing business excluding new hires.")
+    base_growth_pct = st.slider("Base Biz Organic Growth %", 0, 20, 5)
     
     st.divider()
     
-    st.header("2. Scenario A: Standard Hire")
-    st.info("Hiring less experienced techs.")
-    green_cost = st.number_input("Green Tech Cost (Burdened) $", value=90000, step=5000)
-    green_ramp = st.slider("Ramp Up (Months)", 0, 12, 9)
-    green_hires_yr = st.slider("Hires per Year", 1, 4, 2)
+    st.header("2. Revenue Economics")
+    rev_per_tech = st.number_input("Max Revenue per Tech ($)", value=448000, step=10000)
+    parts_ratio = 0.175 # Hardcoded approx based on prev discussion
     
     st.divider()
-
-    st.header("3. Scenario B: Rebadge Strategy")
-    st.info("Hiring expensive veterans.")
-    rebadge_cost = st.number_input("Rebadge Tech Cost (Burdened) $", value=170000, step=5000, min_value=100000, max_value=250000)
-    rebadge_ramp = st.slider("Rebadge Ramp (Months)", 0, 12, 1)
     
-    # Simplified Selectbox for cleaner text parsing later
-    cadence_options = {"Every 6 Months (2/yr)": 6, "Every 4 Months (3/yr)": 4, "Every 3 Months (4/yr)": 3}
-    rebadge_cadence_label = st.selectbox("Hiring Cadence", list(cadence_options.keys()))
-    rebadge_interval = cadence_options[rebadge_cadence_label]
+    st.header("3. Scenario Inputs (Apples to Apples)")
+    
+    # Unified Slider
+    hires_per_year = st.slider("Hires Per Year (Both Scenarios)", 1, 6, 2, help="We hire the same number of people in both models.")
     
     st.markdown("---")
-    st.markdown("**Revenue Economics**")
-    rev_per_tech = st.number_input("Max Revenue per Tech ($)", value=448000, step=10000, help="$210/hr * 1600 hrs + Parts")
+    st.caption("🐢 **Scenario A: Green Techs**")
+    green_cost = st.number_input("Green Start Cost ($)", value=90000, step=5000)
+    green_ramp = st.slider("Green Ramp Up (Months)", 0, 18, 9)
+    # NEW: REALITY CHECK
+    green_raise_yr3 = st.checkbox("Apply Market Raise in Year 3?", value=True, help="If checked, Green tech cost jumps to $120k after 2 years so they don't quit.")
     
-    # DYNAMIC CALCULATION: Parts are approx 17.5% of Total Rev (based on $78k cost / $448k rev)
-    parts_ratio = 0.175 
-    parts_cost_calc = rev_per_tech * parts_ratio
-    
-    gross_margin_tech = ((rev_per_tech - parts_cost_calc - rebadge_cost)/rev_per_tech)*100
-    st.caption(f"Parts Cost Est: ${parts_cost_calc:,.0f}/yr")
-    st.caption(f"Gross Margin at ${rebadge_cost:,.0f} Cost: **{gross_margin_tech:.1f}%**")
+    st.markdown("---")
+    st.caption("🐇 **Scenario B: Rebadge Techs**")
+    rebadge_cost = st.number_input("Rebadge Cost ($)", value=130000, step=5000)
+    rebadge_ramp = st.slider("Rebadge Ramp (Months)", 0, 12, 1)
 
 # ==========================================
 # 2. CALCULATION ENGINE
@@ -67,19 +60,20 @@ with st.sidebar:
 
 def run_comparison():
     months = list(range(1, 49)) # 4 Years (2026-2029)
-    
-    # -- SCENARIO A: STANDARD ORGANIC --
-    org_data = []
     base_monthly = base_rev_2025 / 12
     tech_parts_cost = rev_per_tech * parts_ratio
     
+    # -- SCENARIO A: STANDARD ORGANIC --
+    org_data = []
     cum_green_hires = 0
     
     for m in months:
-        interval = 12 / green_hires_yr
+        # Hiring Logic: Spread evenly
+        interval = 12 / hires_per_year
         if (m-1) % interval == 0:
             cum_green_hires += 1
             
+        # Base Growth
         year_idx = (m-1) // 12
         growth_factor = (1 + (base_growth_pct/100)) ** year_idx
         rev_base = base_monthly * growth_factor
@@ -93,33 +87,35 @@ def run_comparison():
             months_employed = m - start_month
             
             if months_employed >= 0:
-                hire_cost_total += (green_cost / 12)
+                # COST LOGIC: Do they get a raise?
+                current_cost = green_cost
+                if green_raise_yr3 and months_employed > 24:
+                    current_cost = 120000 # Market correction raise
                 
+                hire_cost_total += (current_cost / 12)
+                
+                # REVENUE LOGIC: Ramp
                 pct = 1.0
                 if months_employed < green_ramp:
                     pct = months_employed / max(1, green_ramp)
                 
-                tech_monthly_rev = (rev_per_tech / 12) * pct
-                hire_rev_total += tech_monthly_rev
+                hire_rev_total += (rev_per_tech / 12) * pct
                 hire_parts_cost += (tech_parts_cost / 12) * pct
                 
         total_rev = rev_base + hire_rev_total
-        # Base Biz Cost (60% cost) + New Hire Salaries + New Hire Parts
         total_cost = (rev_base * 0.6) + hire_cost_total + hire_parts_cost
-        
         ebitda = total_rev - total_cost
         
-        org_data.append({"Month": m, "Revenue": total_rev, "EBITDA": ebitda, "Heads": cum_green_hires})
+        org_data.append({"Month": m, "Revenue": total_rev, "EBITDA": ebitda})
         
     # -- SCENARIO B: REBADGE --
     reb_data = []
-    # Use the interval parsed from the dictionary above
-    interval_r = rebadge_interval
-    
     cum_reb_hires = 0
     
     for m in months:
-        if (m-1) % interval_r == 0:
+        # Same Hiring Interval
+        interval = 12 / hires_per_year
+        if (m-1) % interval == 0:
             cum_reb_hires += 1
             
         year_idx = (m-1) // 12
@@ -131,25 +127,25 @@ def run_comparison():
         hire_parts_cost = 0
         
         for h in range(cum_reb_hires):
-            start_month = (h * interval_r) + 1
+            start_month = (h * interval) + 1
             months_employed = m - start_month
             
             if months_employed >= 0:
                 hire_cost_total += (rebadge_cost / 12)
                 
+                # REBADGE RAMP (Faster)
                 pct = 1.0
                 if months_employed < rebadge_ramp:
                     pct = months_employed / max(1, rebadge_ramp)
                 
-                tech_monthly_rev = (rev_per_tech / 12) * pct
-                hire_rev_total += tech_monthly_rev
+                hire_rev_total += (rev_per_tech / 12) * pct
                 hire_parts_cost += (tech_parts_cost / 12) * pct
         
         total_rev = rev_base + hire_rev_total
         total_cost = (rev_base * 0.6) + hire_cost_total + hire_parts_cost
         ebitda = total_rev - total_cost
         
-        reb_data.append({"Month": m, "Revenue": total_rev, "EBITDA": ebitda, "Heads": cum_reb_hires})
+        reb_data.append({"Month": m, "Revenue": total_rev, "EBITDA": ebitda})
         
     return pd.DataFrame(org_data), pd.DataFrame(reb_data)
 
@@ -164,6 +160,10 @@ rr_reb_rev = last_reb['Revenue'] * 12
 rr_org_ebitda = last_org['EBITDA'] * 12
 rr_reb_ebitda = last_reb['EBITDA'] * 12
 
+# Cumulative Cash (The Real Winner Metric)
+cash_org = df_org['EBITDA'].sum()
+cash_reb = df_reb['EBITDA'].sum()
+
 # Margins
 marg_org = (rr_org_ebitda / rr_org_rev) * 100
 marg_reb = (rr_reb_ebitda / rr_reb_rev) * 100
@@ -177,26 +177,28 @@ c1, c2 = st.columns(2)
 with c1:
     st.markdown(f"""
     <div class='org-box'>
-    <h3>🐢 Scenario A: Standard Hiring</h3>
-    <p>Hire <b>{green_hires_yr}/yr</b> at <b>${green_cost/1000:.0f}k</b> cost.</p>
+    <h3>🐢 Scenario A: Green Techs</h3>
+    <p><b>{hires_per_year}</b> hires/yr. <b>{green_ramp}</b> month ramp.</p>
     <hr>
     <span class='risk-metric'>${rr_org_rev/1000000:.1f}M</span> 2029 Revenue<br>
     <span class='risk-metric'>${rr_org_ebitda/1000000:.1f}M</span> 2029 EBITDA<br>
-    <br>
-    <b>Margin:</b> <span class='{"margin-good" if marg_org > 30 else "margin-bad"}'>{marg_org:.1f}%</span>
+    <b>Margin:</b> {marg_org:.1f}%<br><br>
+    <span style='font-size:20px'>🏦 <b>Total Cash Banked:</b> ${cash_org/1000000:.2f}M</span>
     </div>
     """, unsafe_allow_html=True)
 
 with c2:
+    delta_cash = cash_reb - cash_org
     st.markdown(f"""
     <div class='rebadge-box'>
-    <h3>🐇 Scenario B: Rebadge Strategy</h3>
-    <p>Hire <b>1 every {rebadge_interval} Mo</b> at <b>${rebadge_cost/1000:.0f}k</b> cost.</p>
+    <h3>🐇 Scenario B: Rebadge Techs</h3>
+    <p><b>{hires_per_year}</b> hires/yr. <b>{rebadge_ramp}</b> month ramp.</p>
     <hr>
     <span class='risk-metric'>${rr_reb_rev/1000000:.1f}M</span> 2029 Revenue<br>
     <span class='risk-metric'>${rr_reb_ebitda/1000000:.1f}M</span> 2029 EBITDA<br>
-    <br>
-    <b>Margin:</b> <span class='{"margin-good" if marg_reb > 30 else "margin-bad"}'>{marg_reb:.1f}%</span>
+    <b>Margin:</b> {marg_reb:.1f}%<br><br>
+    <span style='font-size:20px'>🏦 <b>Total Cash Banked:</b> ${cash_reb/1000000:.2f}M</span><br>
+    <span style='color:green; font-weight:bold'>(+${delta_cash/1000:.0f}k more cash)</span>
     </div>
     """, unsafe_allow_html=True)
 
@@ -206,33 +208,28 @@ st.divider()
 c_chart1, c_chart2 = st.columns(2)
 
 with c_chart1:
-    st.subheader("Cumulative Profit (EBITDA)")
+    st.subheader("Cumulative Cash (EBITDA)")
     fig1, ax1 = plt.subplots(figsize=(6, 4))
-    
-    # Cumulative Sum of EBITDA over 4 years
-    ax1.plot(df_org['Month'], df_org['EBITDA'].cumsum(), label='Standard', color='#2196f3', linewidth=2)
+    ax1.plot(df_org['Month'], df_org['EBITDA'].cumsum(), label='Green', color='#2196f3', linewidth=2)
     ax1.plot(df_reb['Month'], df_reb['EBITDA'].cumsum(), label='Rebadge', color='#ff9800', linewidth=3)
+    ax1.fill_between(df_reb['Month'], df_org['EBITDA'].cumsum(), df_reb['EBITDA'].cumsum(), color='#ff9800', alpha=0.1)
     
     ax1.set_xlabel('Months (2026-2029)')
-    ax1.set_ylabel('Cash Generated ($)')
+    ax1.set_ylabel('Total Cash Generated ($)')
     ax1.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
     ax1.legend()
-    ax1.grid(True, alpha=0.3)
     st.pyplot(fig1)
 
 with c_chart2:
-    st.subheader("The Cost of Talent vs. Margin")
+    st.subheader("Monthly EBITDA Trend")
     fig2, ax2 = plt.subplots(figsize=(6, 4))
+    ax2.plot(df_org['Month'], df_org['EBITDA'], label='Green', color='#2196f3', alpha=0.6)
+    ax2.plot(df_reb['Month'], df_reb['EBITDA'], label='Rebadge', color='#ff9800', linewidth=3)
     
-    # EBITDA Margin Trend
-    ax2.plot(df_org['Month'], df_org['EBITDA'] / df_org['Revenue'], label='Standard Margin', color='#2196f3', linestyle='--')
-    ax2.plot(df_reb['Month'], df_reb['EBITDA'] / df_reb['Revenue'], label='Rebadge Margin', color='#ff9800', linewidth=3)
-    
-    ax2.set_xlabel('Months')
-    ax2.set_ylabel('EBITDA Margin %')
-    ax2.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+    ax2.set_xlabel('Months (2026-2029)')
+    ax2.set_ylabel('Monthly EBITDA ($)')
+    ax2.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
     ax2.legend()
-    ax2.grid(True, alpha=0.3)
     st.pyplot(fig2)
 
-st.info("💡 **Strategy:** The Orange Line (Rebadge) stays above the Blue Line because you never pay for 'Dead Time' (Ramp Up). The higher salary is easily offset by the immediate revenue.")
+st.info("💡 **The Insight:** Even if the Green Tech margin % catches up in Year 4, look at the **'Total Cash Banked'**. The Rebadge strategy generates significantly more cash over the 4-year period because you never suffered through the 'Training Dip'.")
