@@ -10,10 +10,11 @@ st.set_page_config(page_title="2029 Strategic Exit Model", layout="wide")
 
 st.markdown("""
 <style>
-    .goal-box {background-color: #e8f5e9; padding: 20px; border-radius: 10px; border-left: 10px solid #2e7d32; text-align: center;}
-    .miss-box {background-color: #ffebee; padding: 20px; border-radius: 10px; border-left: 10px solid #c62828; text-align: center;}
+    .goal-box {background-color: #e8f5e9; padding: 15px; border-radius: 10px; border-left: 10px solid #2e7d32; text-align: center; height: 100%;}
+    .miss-box {background-color: #ffebee; padding: 15px; border-radius: 10px; border-left: 10px solid #c62828; text-align: center; height: 100%;}
+    .info-box {background-color: #e3f2fd; padding: 15px; border-radius: 10px; border-left: 10px solid #1565c0; text-align: center; height: 100%;}
     .metric-label {font-size: 14px; color: #555;}
-    .metric-value {font-size: 26px; font-weight: bold;}
+    .metric-value {font-size: 24px; font-weight: bold;}
     .audit-box {background-color: #fff8e1; padding: 15px; border-radius: 5px; border-left: 5px solid #ffc107; font-size: 14px; margin-top: 10px;}
     .resource-box {background-color: #e3f2fd; padding: 10px; border-radius: 5px; margin-top: 10px; font-size: 12px;}
     .split-box {background-color: #f3f3f3; padding: 10px; border-radius: 5px; margin-top: 5px; margin-bottom: 15px; font-size: 13px;}
@@ -37,7 +38,8 @@ with st.sidebar:
 
     # --- REVENUE INPUTS ---
     st.header("2. Service Revenue (Labor + Job Parts)")
-    tm_service_base = st.number_input("Year 1 Total Service Rev ($)", value=2500000, step=100000, format="%d")
+    # UPDATED DEFAULT: 1,500,000
+    tm_service_base = st.number_input("Year 1 Total Service Rev ($)", value=1500000, step=100000, format="%d")
     tm_growth = st.slider("Service Growth %", 0, 100, 20)
     
     st.subheader("Revenue Split")
@@ -70,7 +72,8 @@ with st.sidebar:
     st.divider()
 
     st.header("4. Spare Parts (Direct)")
-    spares_base = st.number_input("Year 1 Spare Parts Rev ($)", value=500000, step=50000, format="%d")
+    # UPDATED DEFAULT: 150,000
+    spares_base = st.number_input("Year 1 Spare Parts Rev ($)", value=150000, step=50000, format="%d")
     spares_growth = st.slider("Spare Parts Growth %", 0, 100, 10)
     spares_margin = st.slider("Spare Parts Margin %", 0, 100, 35)
 
@@ -86,9 +89,11 @@ with st.sidebar:
         
         st.caption("Costs:")
         cost_tech = st.number_input("Tech Cost ($/hr)", value=85, format="%d")
-        cost_eng = st.number_input("Eng Cost ($/hr)", value=95, format="%d")
+        # UPDATED DEFAULT: 85
+        cost_eng = st.number_input("Eng Cost ($/hr)", value=85, format="%d")
         
-        techs_per_loc_input = st.number_input("Max Techs per Location", value=6)
+        # UPDATED DEFAULT: 4
+        techs_per_loc_input = st.number_input("Max Techs per Location", value=4)
         
         # --- TIMING SECTION ---
         st.markdown("---")
@@ -219,7 +224,7 @@ def run_fusion_model():
         total_cogs = cogs_labor_tech + cogs_labor_eng + cogs_job_parts + cogs_spares + cogs_sjob_mat
         gross_profit = total_rev - total_cogs
         
-        # OpEx: RENT LOGIC UPDATE
+        # OpEx: RENT LOGIC
         if is_hq_free:
             billable_locs = max(0, locs - 1)
         else:
@@ -227,7 +232,7 @@ def run_fusion_model():
             
         opex_rent = billable_locs * c_rent_inf * 12
         
-        # OpEx: CENTRAL SUPPORT UPDATE
+        # OpEx: CENTRAL SUPPORT
         if year >= central_start_year and locs > 1:
             central_fee = central_cost * 12 * inf
         else:
@@ -259,6 +264,7 @@ def run_fusion_model():
             "Sales Reps": sales_reps,
             "OpEx: Rent": opex_rent,
             "OpEx: Central": central_fee,
+            "OpEx: Hiring": opex_hire, # Renamed to standard key
             "Total COGS": total_cogs,
             "Total OpEx": total_opex
         })
@@ -268,85 +274,109 @@ def run_fusion_model():
 df = run_fusion_model()
 
 # ==========================================
-# 3. GOAL SEEK DASHBOARD
+# 3. TOP ROW: SCORECARDS (Side-by-Side)
 # ==========================================
 
 # Compare 2026 (Row 0) and 2029 (Row 3)
 yr1 = df.iloc[0]
 yr4 = df.iloc[-1]
 
-c_goal1, c_goal2, c_chart = st.columns([1, 1, 3])
+c1, c2, c3 = st.columns(3)
 
-with c_goal1:
+with c1:
     gap_26 = yr1['Total Revenue'] - target_2026
     color_26 = "green" if gap_26 >= 0 else "red"
     label_26 = "Surplus" if gap_26 >= 0 else "Shortfall"
     
     st.markdown(f"""
-    <div style='background-color: {"#e8f5e9" if gap_26 >= 0 else "#ffebee"}; padding: 15px; border-radius: 10px; border-left: 8px solid {color_26}; text-align: center;'>
+    <div class='goal-box' style='border-left: 10px solid {color_26}; background-color: {"#e8f5e9" if gap_26 >= 0 else "#ffebee"};'>
     <h4>2026 Performance</h4>
-    <span style='font-size:14px; color:#555;'>Projected</span><br>
-    <span style='font-size:22px; font-weight:bold;'>${yr1['Total Revenue']:,.0f}</span><br>
+    <span class='metric-label'>Projected vs Target</span><br>
+    <span class='metric-value'>${yr1['Total Revenue']:,.0f}</span><br>
     <span style='color:{color_26}; font-weight:bold;'>{'+' if gap_26>=0 else ''}${gap_26:,.0f} {label_26}</span>
     </div>
     """, unsafe_allow_html=True)
 
-with c_goal2:
+with c2:
     gap_29 = yr4['Total Revenue'] - exit_target
     color_29 = "green" if gap_29 >= 0 else "red"
     label_29 = "Surplus" if gap_29 >= 0 else "Shortfall"
     
     st.markdown(f"""
-    <div style='background-color: {"#e8f5e9" if gap_29 >= 0 else "#ffebee"}; padding: 15px; border-radius: 10px; border-left: 8px solid {color_29}; text-align: center;'>
+    <div class='goal-box' style='border-left: 10px solid {color_29}; background-color: {"#e8f5e9" if gap_29 >= 0 else "#ffebee"};'>
     <h4>2029 Exit Status</h4>
-    <span style='font-size:14px; color:#555;'>Projected</span><br>
-    <span style='font-size:22px; font-weight:bold;'>${yr4['Total Revenue']:,.0f}</span><br>
+    <span class='metric-label'>Projected vs Target</span><br>
+    <span class='metric-value'>${yr4['Total Revenue']:,.0f}</span><br>
     <span style='color:{color_29}; font-weight:bold;'>{'+' if gap_29>=0 else ''}${gap_29:,.0f} {label_29}</span>
     </div>
     """, unsafe_allow_html=True)
 
-with c_chart:
-    st.subheader("Revenue Path (With Margin)")
-    fig, ax = plt.subplots(figsize=(10, 5))
+with c3:
+    # Single Tech Capacity Math
+    lab_cap = 2080 * utilization * bill_rate
+    ticket_cap = lab_cap / (labor_split_pct/100)
+    parts_cap = ticket_cap - lab_cap
     
-    years = df['Year']
-    p1 = ax.bar(years, df['Rev: Labor'], label='Service Labor', color='#1565c0')
-    p2 = ax.bar(years, df['Rev: Job Parts'], bottom=df['Rev: Labor'], label='Job Parts', color='#64b5f6')
-    p3 = ax.bar(years, df['Rev: S-Jobs'], bottom=df['Rev: Labor']+df['Rev: Job Parts'], label='S-Jobs', color='#ffb74d')
-    p4 = ax.bar(years, df['Rev: Spare Parts'], bottom=df['Rev: Labor']+df['Rev: Job Parts']+df['Rev: S-Jobs'], label='Spare Parts', color='#81c784')
-    
-    # Data Labels
-    for container in ax.containers:
-        labels = [f'${v/1000000:.1f}M' if v > 100000 else "" for v in container.datavalues]
-        ax.bar_label(container, labels=labels, label_type='center', color='white', fontsize=9, padding=0)
-
-    # EBITDA Line
-    ax2 = ax.twinx()
-    ax2.plot(years, df['EBITDA %'] * 100, color='#212121', linestyle='-', linewidth=3, marker='o', label='EBITDA Margin')
-    ax2.set_ylabel('EBITDA Margin (%)', color='#212121')
-    
-    # Legend at bottom
-    lines, labels = ax.get_legend_handles_labels()
-    lines2, labels2 = ax2.get_legend_handles_labels()
-    ax.legend(lines + lines2, labels + labels2, loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=3, frameon=False)
-    
-    # Target Lines
-    ax.axhline(y=exit_target, color='red', linestyle='--', linewidth=2)
-    ax.text(2026.5, exit_target, f" Exit: ${exit_target/1000000:.1f}M", color='red', va='bottom', fontweight='bold')
-    
-    ax.axhline(y=target_2026, color='blue', linestyle=':', linewidth=2)
-    ax.text(2025.6, target_2026, f" 2026 Goal: ${target_2026/1000000:.1f}M", color='blue', va='bottom', fontsize=8)
-    
-    ax.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
-    ax2.yaxis.set_major_formatter(mtick.PercentFormatter(decimals=0))
-    ax.spines['top'].set_visible(False)
-    plt.tight_layout()
-    st.pyplot(fig)
+    st.markdown(f"""
+    <div class='info-box'>
+    <h4>💡 Tech Revenue Reality</h4>
+    <span class='metric-label'>Rev per 1 Tech (Full Utilization)</span><br>
+    <span class='metric-value'>${ticket_cap:,.0f}</span><br>
+    <span style='font-size:12px; color:#333;'>(${lab_cap:,.0f} Labor + ${parts_cap:,.0f} Parts)</span>
+    </div>
+    """, unsafe_allow_html=True)
 
 st.divider()
 
 # ==========================================
-# 4. AUDIT CENTER (TABBED)
+# 4. CHART SECTION (Full Width)
+# ==========================================
+
+st.subheader("Revenue Path to Exit (With EBITDA Margin)")
+fig, ax = plt.subplots(figsize=(10, 5))
+
+years = df['Year']
+# Stacked Bars
+p1 = ax.bar(years, df['Rev: Labor'], label='Service Labor', color='#1565c0')
+p2 = ax.bar(years, df['Rev: Job Parts'], bottom=df['Rev: Labor'], label='Job Parts', color='#64b5f6')
+p3 = ax.bar(years, df['Rev: S-Jobs'], bottom=df['Rev: Labor']+df['Rev: Job Parts'], label='S-Jobs', color='#ffb74d')
+p4 = ax.bar(years, df['Rev: Spare Parts'], bottom=df['Rev: Labor']+df['Rev: Job Parts']+df['Rev: S-Jobs'], label='Spare Parts', color='#81c784')
+
+# Add Data Labels (Compact Millions)
+for container in ax.containers:
+    labels = [f'${v/1000000:.1f}M' if v > 100000 else "" for v in container.datavalues]
+    ax.bar_label(container, labels=labels, label_type='center', color='white', fontsize=9, padding=0)
+
+# EBITDA Line on Secondary Axis (NOW PERCENTAGE)
+ax2 = ax.twinx()
+ax2.plot(years, df['EBITDA %'] * 100, color='#212121', linestyle='-', linewidth=3, marker='o', label='EBITDA Margin')
+ax2.set_ylabel('EBITDA Margin (%)', color='#212121')
+
+# Combined Legend logic - MOVED TO BOTTOM
+lines, labels = ax.get_legend_handles_labels()
+lines2, labels2 = ax2.get_legend_handles_labels()
+ax.legend(lines + lines2, labels + labels2, loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=3, frameon=False)
+
+# Target Lines
+ax.axhline(y=exit_target, color='red', linestyle='--', linewidth=2)
+ax.text(2026.5, exit_target, f" Exit: ${exit_target/1000000:.1f}M", color='red', va='bottom', fontweight='bold')
+
+ax.axhline(y=target_2026, color='blue', linestyle=':', linewidth=2)
+ax.text(2026.1, target_2026, f" Year 1: ${target_2026/1000000:.1f}M", color='blue', va='bottom', fontsize=8)
+
+# Format Axes
+ax.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
+ax2.yaxis.set_major_formatter(mtick.PercentFormatter(decimals=0))
+
+ax.spines['top'].set_visible(False)
+plt.tight_layout()
+
+st.pyplot(fig)
+
+st.divider()
+
+# ==========================================
+# 5. AUDIT CENTER (TABBED)
 # ==========================================
 
 st.subheader("🔍 Audit Center")
@@ -373,7 +403,16 @@ with tab2:
     st.dataframe(format_df(df[cols], fmt), use_container_width=True)
 
 with tab3:
-    st.markdown("### Hiring & Operations")
-    cols = ['Year', 'Total Hires', 'OpEx: Hiring', 'Eng FTE']
-    fmt = {'Year':'{:.0f}', 'Total Hires':'{:.0f}', 'OpEx: Hiring':'${:,.0f}', 'Eng FTE':'{:.2f}'}
+    st.markdown("### Hiring & Operations Audit")
+    # Updated keys to match exactly what is in data.append
+    cols = ['Year', 'Total Hires', 'OpEx: Hiring', 'OpEx: Rent', 'OpEx: Central']
+    
+    fmt = {'Year':'{:.0f}', 'Total Hires':'{:.0f}', 'OpEx: Hiring':'${:,.0f}', 'OpEx: Rent':'${:,.0f}', 'OpEx: Central':'${:,.0f}'}
+    
     st.dataframe(format_df(df[cols], fmt), use_container_width=True)
+    st.markdown(f"""
+    <div class='audit-box'>
+    <b>Rent Rule:</b> HQ Free = {is_hq_free}. You pay for Locs-1.<br>
+    <b>Central Rule:</b> Starts in {central_start_year} AND requires > 1 Location.
+    </div>
+    """, unsafe_allow_html=True)
