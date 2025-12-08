@@ -27,6 +27,7 @@ st.markdown("Test the **Max Salary** theory. How much can we pay a Rebadge Tech 
 with st.sidebar:
     st.header("1. Baseline")
     base_rev_2025 = st.number_input("2025 Start Revenue ($)", value=1500000, step=100000, format="%d")
+    base_growth_pct = st.slider("Base Biz Organic Growth %", 0, 20, 5, help="Growth of existing business excluding new hires.")
     
     st.divider()
     
@@ -40,7 +41,6 @@ with st.sidebar:
 
     st.header("3. Scenario B: Rebadge Strategy")
     st.info("Hiring expensive veterans.")
-    # INCREASED MAX RANGE to $250k
     rebadge_cost = st.number_input("Rebadge Tech Cost (Burdened) $", value=170000, step=5000, min_value=100000, max_value=250000)
     rebadge_ramp = st.slider("Rebadge Ramp (Months)", 0, 12, 1)
     rebadge_cadence = st.selectbox("Hiring Cadence", ["Every 6 Months (2/yr)", "Every 4 Months (3/yr)", "Every 3 Months (4/yr)"])
@@ -48,8 +48,14 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("**Revenue Economics**")
     rev_per_tech = st.number_input("Max Revenue per Tech ($)", value=448000, step=10000, help="$210/hr * 1600 hrs + Parts")
-    # Added Margin Context
-    st.caption(f"At ${rebadge_cost:,.0f} cost, Gross Margin is **{((rev_per_tech - 78000 - rebadge_cost)/rev_per_tech)*100:.1f}%**")
+    
+    # DYNAMIC CALCULATION: Parts are approx 17.5% of Total Rev (based on $78k cost / $448k rev)
+    parts_ratio = 0.175 
+    parts_cost_calc = rev_per_tech * parts_ratio
+    
+    gross_margin_tech = ((rev_per_tech - parts_cost_calc - rebadge_cost)/rev_per_tech)*100
+    st.caption(f"Parts Cost Est: ${parts_cost_calc:,.0f}/yr")
+    st.caption(f"Gross Margin at ${rebadge_cost:,.0f} Cost: **{gross_margin_tech:.1f}%**")
 
 # ==========================================
 # 2. CALCULATION ENGINE
@@ -61,7 +67,9 @@ def run_comparison():
     # -- SCENARIO A: STANDARD ORGANIC --
     org_data = []
     base_monthly = base_rev_2025 / 12
-    tech_parts_cost = 78000 # Annual parts cost per tech (approx)
+    
+    # Dynamic Parts Cost (Linked to Revenue Input)
+    tech_parts_cost = rev_per_tech * parts_ratio
     
     cum_green_hires = 0
     
@@ -71,7 +79,9 @@ def run_comparison():
             cum_green_hires += 1
             
         year_idx = (m-1) // 12
-        rev_base = base_monthly * (1.05 ** year_idx)
+        # Use Slider for Base Growth
+        growth_factor = (1 + (base_growth_pct/100)) ** year_idx
+        rev_base = base_monthly * growth_factor
         
         hire_rev_total = 0
         hire_cost_total = 0
@@ -115,7 +125,8 @@ def run_comparison():
             cum_reb_hires += 1
             
         year_idx = (m-1) // 12
-        rev_base = base_monthly * (1.05 ** year_idx)
+        growth_factor = (1 + (base_growth_pct/100)) ** year_idx
+        rev_base = base_monthly * growth_factor
         
         hire_rev_total = 0
         hire_cost_total = 0
@@ -169,6 +180,8 @@ with c1:
     st.markdown(f"""
     <div class='org-box'>
     <h3>🐢 Scenario A: Standard Hiring</h3>
+    <p>Hire {green_hires_yr}/yr at ${green_cost/1000:.0f}k cost.</p>
+    <hr>
     <span class='risk-metric'>${rr_org_rev/1000000:.1f}M</span> 2029 Revenue<br>
     <span class='risk-metric'>${rr_org_ebitda/1000000:.1f}M</span> 2029 EBITDA<br>
     <br>
@@ -180,6 +193,8 @@ with c2:
     st.markdown(f"""
     <div class='rebadge-box'>
     <h3>🐇 Scenario B: Rebadge Strategy</h3>
+    <p>Hire 1 every {rebadge_cadence.split(' ')[2]} at ${rebadge_cost/1000:.0f}k cost.</p>
+    <hr>
     <span class='risk-metric'>${rr_reb_rev/1000000:.1f}M</span> 2029 Revenue<br>
     <span class='risk-metric'>${rr_reb_ebitda/1000000:.1f}M</span> 2029 EBITDA<br>
     <br>
@@ -195,8 +210,11 @@ c_chart1, c_chart2 = st.columns(2)
 with c_chart1:
     st.subheader("Cumulative Profit (EBITDA)")
     fig1, ax1 = plt.subplots(figsize=(6, 4))
+    
+    # Cumulative Sum of EBITDA over 4 years
     ax1.plot(df_org['Month'], df_org['EBITDA'].cumsum(), label='Standard', color='#2196f3', linewidth=2)
     ax1.plot(df_reb['Month'], df_reb['EBITDA'].cumsum(), label='Rebadge', color='#ff9800', linewidth=3)
+    
     ax1.set_xlabel('Months (2026-2029)')
     ax1.set_ylabel('Cash Generated ($)')
     ax1.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
