@@ -33,44 +33,32 @@ with st.sidebar:
 
     st.divider()
 
-    # --- NEW COMBINED SECTION ---
+    # --- REVENUE INPUTS ---
     st.header("2. Service Revenue (Labor + Job Parts)")
-    st.caption("Total T&M Service Revenue including attached parts.")
-    
     tm_service_base = st.number_input("Year 1 Total Service Rev ($)", value=2500000, step=100000, format="%d")
     tm_growth = st.slider("Service Growth %", 0, 100, 20)
     
     st.subheader("Revenue Split")
-    labor_split_pct = st.slider("Split: % from Labor", 0, 100, 75, help="The remaining % is automatically Job Parts.")
+    labor_split_pct = st.slider("Split: % from Labor", 0, 100, 75)
     
-    # Calculate Split for Display
     disp_labor = tm_service_base * (labor_split_pct/100)
     disp_parts = tm_service_base * (1 - (labor_split_pct/100))
+    st.markdown(f"<div class='split-box'><b>Year 1 Breakdown:</b><br>🛠️ Labor: <b>${disp_labor:,.0f}</b><br>⚙️ Job Parts: <b>${disp_parts:,.0f}</b></div>", unsafe_allow_html=True)
     
-    st.markdown(f"""
-    <div class='split-box'>
-    <b>Year 1 Breakdown:</b><br>
-    🛠️ Labor: <b>${disp_labor:,.0f}</b><br>
-    ⚙️ Job Parts: <b>${disp_parts:,.0f}</b>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    with st.expander("Service Settings (Margins/Rates)"):
+    with st.expander("Service Settings"):
         bill_rate = st.number_input("Bill Rate ($/hr)", value=210, format="%d")
         utilization = st.slider("Tech Utilization %", 50, 100, 80) / 100
         job_parts_margin = st.slider("Job Parts Margin %", 0, 100, 30)
 
     st.divider()
 
-    st.header("3. Revenue Stream C: S-Jobs")
-    st.caption("Fixed Bid Projects.")
+    st.header("3. S-Jobs (Projects)")
     s_job_base = st.number_input("Year 1 S-Job Rev ($)", value=1000000, step=100000, format="%d")
     s_job_growth = st.slider("S-Job Growth %", 0, 100, 15)
     
-    with st.expander("S-Job Cost & Resources"):
+    with st.expander("S-Job Settings"):
         sj_mat_pct = st.slider("S-Job Mat Cost %", 0, 100, 50)
         sj_lab_pct = st.slider("S-Job Labor Cost %", 0, 100, 30)
-        st.caption("Resource Split (Labor Portion):")
         c1, c2 = st.columns(2)
         w_tech = c1.number_input("Tech %", value=20, format="%d")/100
         w_me = c2.number_input("ME %", value=40, format="%d")/100
@@ -79,9 +67,8 @@ with st.sidebar:
 
     st.divider()
 
-    st.header("4. Revenue Stream D: Spare Parts")
-    st.caption("Pure Box Sales (No Labor).")
-    spares_base = st.number_input("Year 1 Spare Parts Rev ($)", value=500000, step=50000, format="%d")
+    st.header("4. Spare Parts (Direct)")
+    spares_base = st.number_input("Year 1 Spares Rev ($)", value=500000, step=50000, format="%d")
     spares_growth = st.slider("Spare Parts Growth %", 0, 100, 10)
     spares_margin = st.slider("Spare Parts Margin %", 0, 100, 35)
 
@@ -101,8 +88,16 @@ with st.sidebar:
         
         techs_per_loc_input = st.number_input("Max Techs per Location", value=6)
         
-        rent = st.number_input("Rent ($/mo)", value=5000, format="%d")
-        central = st.number_input("Central Support ($/mo)", value=8000, format="%d")
+        # --- NEW TIMING SECTION ---
+        st.markdown("---")
+        st.markdown("#### ⏳ Timing & Triggers")
+        rent_per_loc = st.number_input("Rent ($/mo)", value=5000, format="%d")
+        is_hq_free = st.checkbox("Is HQ Rent Free?", value=True, help="If checked, you only pay rent for Location 2, 3, etc.")
+        
+        central_cost = st.number_input("Central Support ($/mo)", value=8000, format="%d")
+        central_start_year = st.selectbox("Start Central Support In:", [2026, 2027, 2028, 2029], index=1, help="Defers corporate allocations until this year.")
+        
+        st.markdown("---")
         
         st.caption("Hiring & Sales:")
         attrition = st.slider("Attrition %", 0, 20, 10)
@@ -115,8 +110,8 @@ with st.sidebar:
         st.markdown(f"""
         <div class='resource-box'>
         <b>Live Logic Check (Year 1):</b><br>
-        Total Rev: <b>${tm_service_base+s_job_base+spares_base:,.0f}</b><br>
         Sales Reps: <b>{math.floor((tm_service_base+s_job_base+spares_base)/sales_trigger)}</b><br>
+        Central Costs: <b>{"ACTIVE" if 2026 >= central_start_year else "OFF"}</b>
         </div>
         """, unsafe_allow_html=True)
 
@@ -129,7 +124,6 @@ def run_fusion_model():
     data = []
     
     # Growth Trackers
-    # Now we track TOTAL Service, then split it later
     curr_service_target = tm_service_base
     curr_sjob_target = s_job_base
     curr_spares_target = spares_base
@@ -150,7 +144,7 @@ def run_fusion_model():
         c_eng_inf = cost_eng * inf
         c_bill_inf = bill_rate * inf
         c_hire_inf = hire_cost * inf
-        c_rent_inf = rent * inf
+        c_rent_inf = rent_per_loc * inf
         
         # 2. CALCULATE REVENUE STREAMS
         if i > 0:
@@ -158,8 +152,7 @@ def run_fusion_model():
             curr_sjob_target = curr_sjob_target * (1 + s_job_growth/100)
             curr_spares_target = curr_spares_target * (1 + spares_growth/100)
             
-        # SPLIT SERVICE REVENUE (LABOR vs PARTS)
-        # Based on the slider percentage
+        # SPLIT SERVICE REVENUE
         curr_labor_target = curr_service_target * (labor_split_pct / 100)
         curr_job_parts_rev = curr_service_target * (1 - (labor_split_pct / 100))
         
@@ -168,7 +161,6 @@ def run_fusion_model():
         
         # 3. RESOURCE LOADING
         # A. Techs for Service Labor
-        # Capacity = 2080 * Util * BillRate
         labor_capacity_per_tech = 2080 * utilization * c_bill_inf
         techs_for_service = math.ceil(curr_labor_target / labor_capacity_per_tech)
         
@@ -186,10 +178,8 @@ def run_fusion_model():
         req_prog = math.ceil(sj_prog_fte)
         
         # 4. HIRING & ATTRITION
-        # Techs
         new_techs = max(0, req_techs - cum_techs)
         cum_techs = max(cum_techs, req_techs)
-        # Eng
         new_me = max(0, req_me - cum_me)
         cum_me = max(cum_me, req_me)
         new_ce = max(0, req_ce - cum_ce)
@@ -206,20 +196,16 @@ def run_fusion_model():
         
         # 5. OPERATIONS
         locs = math.ceil(cum_techs / techs_per_loc_input) 
-        
         managers = math.ceil(cum_techs / 10)
         sales_reps = math.floor(total_rev / sales_trigger)
         
         # 6. FINANCIALS
         
         # COGS
-        # Labor: Service Techs (Full Headcount Cost)
         cogs_labor_tech = cum_techs * 2080 * c_tech_inf
-        # Labor: Eng (Allocated FTE Cost)
         total_eng_fte = sj_me_fte + sj_ce_fte + sj_prog_fte
         cogs_labor_eng = total_eng_fte * 2080 * c_eng_inf
         
-        # Parts/Mat
         cogs_job_parts = curr_job_parts_rev * (1 - (job_parts_margin/100))
         cogs_spares = curr_spares_target * (1 - (spares_margin/100))
         cogs_sjob_mat = curr_sjob_target * (sj_mat_pct/100)
@@ -227,14 +213,27 @@ def run_fusion_model():
         total_cogs = cogs_labor_tech + cogs_labor_eng + cogs_job_parts + cogs_spares + cogs_sjob_mat
         gross_profit = total_rev - total_cogs
         
-        # OpEx
-        opex_rent = locs * c_rent_inf * 12
+        # OpEx: RENT LOGIC UPDATE
+        # If HQ is free, we pay rent for (locs - 1). If locs is 1, rent is 0.
+        if is_hq_free:
+            billable_locs = max(0, locs - 1)
+        else:
+            billable_locs = locs
+            
+        opex_rent = billable_locs * c_rent_inf * 12
+        
+        # OpEx: CENTRAL SUPPORT UPDATE
+        # Only charge if Current Year >= Start Year AND Locs > 1
+        if year >= central_start_year and locs > 1:
+            central_fee = central_cost * 12 * inf
+        else:
+            central_fee = 0
+            
         opex_mgr = managers * (85000 * 1.2 * inf)
         opex_sales = sales_reps * (sales_rep_cost * inf)
-        opex_central = (central * 12 * inf) if locs > 1 else 0
         opex_hire = total_hires * c_hire_inf
         
-        total_opex = opex_rent + opex_mgr + opex_sales + opex_central + opex_hire
+        total_opex = opex_rent + opex_mgr + opex_sales + central_fee + opex_hire
         
         ebitda = gross_profit - total_opex
         
@@ -251,11 +250,11 @@ def run_fusion_model():
             "MEs": cum_me,
             "CEs": cum_ce,
             "Progs": cum_prog,
-            "Eng FTE": total_eng_fte,
             "Total Hires": total_hires,
             "Locations": locs,
             "Sales Reps": sales_reps,
-            "OpEx: Hiring": opex_hire,
+            "OpEx: Rent": opex_rent,
+            "OpEx: Central": central_fee,
             "Total COGS": total_cogs,
             "Total OpEx": total_opex
         })
@@ -275,7 +274,6 @@ gap = actual_2029 - exit_target
 c_goal, c_chart = st.columns([1, 2])
 
 with c_goal:
-    # GOAL BOX
     if gap >= 0:
         st.markdown(f"""
         <div class='goal-box'>
@@ -296,10 +294,7 @@ with c_goal:
         """, unsafe_allow_html=True)
         
     st.markdown("### 💡 Tech Revenue Reality")
-    # Single Tech Capacity Math
     lab_cap = 2080 * utilization * bill_rate
-    # Total Ticket (Derived from Labor Split)
-    # If Labor is 75% of ticket... Ticket = Labor / 0.75
     ticket_cap = lab_cap / (labor_split_pct/100)
     parts_cap = ticket_cap - lab_cap
     
@@ -313,33 +308,26 @@ with c_chart:
     fig, ax = plt.subplots(figsize=(10, 6))
     
     years = df['Year']
-    # Stacked Bars
     p1 = ax.bar(years, df['Rev: Labor'], label='Service Labor', color='#1565c0')
     p2 = ax.bar(years, df['Rev: Job Parts'], bottom=df['Rev: Labor'], label='Job Parts', color='#64b5f6')
     p3 = ax.bar(years, df['Rev: S-Jobs'], bottom=df['Rev: Labor']+df['Rev: Job Parts'], label='S-Jobs', color='#ffb74d')
     p4 = ax.bar(years, df['Rev: Spare Parts'], bottom=df['Rev: Labor']+df['Rev: Job Parts']+df['Rev: S-Jobs'], label='Spare Parts', color='#81c784')
     
-    # Add Data Labels (Compact Millions)
     for container in ax.containers:
-        # Create labels, but skip if value is 0 or very small
         labels = [f'${v/1000000:.1f}M' if v > 100000 else "" for v in container.datavalues]
         ax.bar_label(container, labels=labels, label_type='center', color='white', fontsize=9, padding=0)
 
-    # EBITDA Line on Secondary Axis (NOW PERCENTAGE)
     ax2 = ax.twinx()
     ax2.plot(years, df['EBITDA %'] * 100, color='#212121', linestyle='-', linewidth=3, marker='o', label='EBITDA Margin')
     ax2.set_ylabel('EBITDA Margin (%)', color='#212121')
     
-    # Combined Legend logic - MOVED TO BOTTOM
     lines, labels = ax.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax.legend(lines + lines2, labels + labels2, loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=3, frameon=False)
     
-    # Target Line
     ax.axhline(y=exit_target, color='red', linestyle='--', linewidth=2, label='Exit Target')
     ax.text(2026, exit_target, " Exit Target", color='red', va='bottom')
     
-    # Format Axes
     ax.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
     ax2.yaxis.set_major_formatter(mtick.PercentFormatter(decimals=0))
     
@@ -358,7 +346,6 @@ st.subheader("🔍 Audit Center")
 
 tab1, tab2, tab3 = st.tabs(["💰 P&L Detail", "👥 Headcount Path", "📊 Hiring & Ops"])
 
-# Helper for formatting
 def format_df(d, m): return d.style.format(m)
 
 with tab1:
@@ -379,18 +366,17 @@ with tab2:
     fmt = {'Year':'{:.0f}', 'Techs':'{:.0f}', 'MEs':'{:.0f}', 'CEs':'{:.0f}', 'Progs':'{:.0f}', 'Locations':'{:.0f}', 'Sales Reps':'{:.0f}'}
     
     st.dataframe(format_df(df[cols], fmt), use_container_width=True)
-    st.info("Headcount is driven by the Revenue Targets set in the sidebar.")
 
 with tab3:
-    st.markdown("### Hiring & Operations")
-    cols = ['Year', 'Total Hires', 'OpEx: Hiring', 'Eng FTE']
+    st.markdown("### Hiring & Operations Audit")
+    cols = ['Year', 'OpEx: Rent', 'OpEx: Central', 'Total Hires']
     
-    fmt = {'Year':'{:.0f}', 'Total Hires':'{:.0f}', 'OpEx: Hiring':'${:,.0f}', 'Eng FTE':'{:.2f}'}
+    fmt = {'Year':'{:.0f}', 'Total Hires':'{:.0f}', 'OpEx: Rent':'${:,.0f}', 'OpEx: Central':'${:,.0f}'}
     
     st.dataframe(format_df(df[cols], fmt), use_container_width=True)
     st.markdown(f"""
     <div class='audit-box'>
-    <b>Hiring Cost Logic:</b><br>
-    Includes <b>${hire_cost:,.0f}</b> cost per hire for both Growth and Attrition ({attrition}%).
+    <b>Rent Rule:</b> HQ Free = {is_hq_free}. You pay for Locs-1.<br>
+    <b>Central Rule:</b> Starts in {central_start_year} AND requires > 1 Location.
     </div>
     """, unsafe_allow_html=True)
