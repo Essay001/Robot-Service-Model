@@ -65,11 +65,11 @@ with st.sidebar:
 
     st.divider()
 
-    st.header("5. Revenue Stream D: Spares")
+    st.header("5. Revenue Stream D: Spare Parts")
     st.caption("Pure Box Sales (No Labor).")
-    spares_base = st.number_input("Year 1 Spares Rev ($)", value=500000, step=50000, format="%d")
-    spares_growth = st.slider("Spares Growth %", 0, 100, 10)
-    spares_margin = st.slider("Spares Margin %", 0, 100, 35)
+    spares_base = st.number_input("Year 1 Spare Parts Rev ($)", value=500000, step=50000, format="%d")
+    spares_growth = st.slider("Spare Parts Growth %", 0, 100, 10)
+    spares_margin = st.slider("Spare Parts Margin %", 0, 100, 35)
 
     st.divider()
 
@@ -289,7 +289,7 @@ with c_chart:
     p1 = ax.bar(years, df['Rev: Labor'], label='Service Labor', color='#1565c0')
     p2 = ax.bar(years, df['Rev: Job Parts'], bottom=df['Rev: Labor'], label='Job Parts', color='#64b5f6')
     p3 = ax.bar(years, df['Rev: S-Jobs'], bottom=df['Rev: Labor']+df['Rev: Job Parts'], label='S-Jobs', color='#ffb74d')
-    p4 = ax.bar(years, df['Rev: Spares'], bottom=df['Rev: Labor']+df['Rev: Job Parts']+df['Rev: S-Jobs'], label='Pure Spares', color='#81c784')
+    p4 = ax.bar(years, df['Rev: Spares'], bottom=df['Rev: Labor']+df['Rev: Job Parts']+df['Rev: S-Jobs'], label='Pure Spare Parts', color='#81c784')
     
     # Target Line
     ax.axhline(y=exit_target, color='red', linestyle='--', linewidth=2, label='Exit Target')
@@ -347,4 +347,5 @@ with tab3:
     Includes <b>${hire_cost:,.0f}</b> cost per hire for both Growth and Attrition ({attrition}%).
     </div>
     """, unsafe_allow_html=True)
+
 
