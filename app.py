@@ -28,14 +28,16 @@ st.markdown("The complete business plan: **4-Stream Revenue**, **Resource Loadin
 # ==========================================
 
 with st.sidebar:
-    st.header("1. The Exit Goal")
-    exit_target = st.number_input("2029 Revenue Target ($)", value=3500000, step=250000, format="%d")
+    st.header("1. Strategic Goals")
+    c_g1, c_g2 = st.columns(2)
+    target_2026 = c_g1.number_input("2026 Target ($)", value=4000000, step=250000, format="%d", help="Your goal for Year 1.")
+    exit_target = c_g2.number_input("2029 Target ($)", value=7500000, step=250000, format="%d", help="Your Exit Number.")
 
     st.divider()
 
     # --- REVENUE INPUTS ---
     st.header("2. Service Revenue (Labor + Job Parts)")
-    tm_service_base = st.number_input("Year 1 Total Service Rev ($)", value=1500000, step=100000, format="%d")
+    tm_service_base = st.number_input("Year 1 Total Service Rev ($)", value=2500000, step=100000, format="%d")
     tm_growth = st.slider("Service Growth %", 0, 100, 20)
     
     st.subheader("Revenue Split")
@@ -68,7 +70,7 @@ with st.sidebar:
     st.divider()
 
     st.header("4. Spare Parts (Direct)")
-    spares_base = st.number_input("Year 1 Spares Rev ($)", value=150000, step=50000, format="%d")
+    spares_base = st.number_input("Year 1 Spare Parts Rev ($)", value=500000, step=50000, format="%d")
     spares_growth = st.slider("Spare Parts Growth %", 0, 100, 10)
     spares_margin = st.slider("Spare Parts Margin %", 0, 100, 35)
 
@@ -84,11 +86,11 @@ with st.sidebar:
         
         st.caption("Costs:")
         cost_tech = st.number_input("Tech Cost ($/hr)", value=85, format="%d")
-        cost_eng = st.number_input("Eng Cost ($/hr)", value=85, format="%d")
+        cost_eng = st.number_input("Eng Cost ($/hr)", value=95, format="%d")
         
         techs_per_loc_input = st.number_input("Max Techs per Location", value=6)
         
-        # --- NEW TIMING SECTION ---
+        # --- TIMING SECTION ---
         st.markdown("---")
         st.markdown("#### ⏳ Timing & Triggers")
         rent_per_loc = st.number_input("Rent ($/mo)", value=5000, format="%d")
@@ -102,16 +104,20 @@ with st.sidebar:
         st.caption("Hiring & Sales:")
         attrition = st.slider("Attrition %", 0, 20, 10)
         hire_cost = st.number_input("Hire Cost ($)", value=12000, format="%d")
-        sales_trigger = st.number_input("Rev per Sales Rep", value=5000000, format="%d")
+        sales_trigger = st.number_input("Rev per Sales Rep", value=3000000, format="%d")
         sales_rep_cost = 120000
         
         inflation = st.slider("Inflation %", 0, 10, 3) / 100
         
+        # Live calc of 2026 Total
+        total_2026_input = tm_service_base + s_job_base + spares_base
+        
         st.markdown(f"""
         <div class='resource-box'>
-        <b>Live Logic Check (Year 1):</b><br>
-        Sales Reps: <b>{math.floor((tm_service_base+s_job_base+spares_base)/sales_trigger)}</b><br>
-        Central Costs: <b>{"ACTIVE" if 2026 >= central_start_year else "OFF"}</b>
+        <b>Year 1 Check:</b><br>
+        Inputs Total: <b>${total_2026_input:,.0f}</b><br>
+        Target: <b>${target_2026:,.0f}</b><br>
+        Gap: <b style='color:{"green" if total_2026_input >= target_2026 else "red"}'>${total_2026_input - target_2026:,.0f}</b>
         </div>
         """, unsafe_allow_html=True)
 
@@ -214,7 +220,6 @@ def run_fusion_model():
         gross_profit = total_rev - total_cogs
         
         # OpEx: RENT LOGIC UPDATE
-        # If HQ is free, we pay rent for (locs - 1). If locs is 1, rent is 0.
         if is_hq_free:
             billable_locs = max(0, locs - 1)
         else:
@@ -223,7 +228,6 @@ def run_fusion_model():
         opex_rent = billable_locs * c_rent_inf * 12
         
         # OpEx: CENTRAL SUPPORT UPDATE
-        # Only charge if Current Year >= Start Year AND Locs > 1
         if year >= central_start_year and locs > 1:
             central_fee = central_cost * 12 * inf
         else:
@@ -267,45 +271,43 @@ df = run_fusion_model()
 # 3. GOAL SEEK DASHBOARD
 # ==========================================
 
-final_yr = df.iloc[-1]
-actual_2029 = final_yr['Total Revenue']
-gap = actual_2029 - exit_target
+# Compare 2026 (Row 0) and 2029 (Row 3)
+yr1 = df.iloc[0]
+yr4 = df.iloc[-1]
 
-c_goal, c_chart = st.columns([1, 2])
+c_goal1, c_goal2, c_chart = st.columns([1, 1, 3])
 
-with c_goal:
-    if gap >= 0:
-        st.markdown(f"""
-        <div class='goal-box'>
-        <h3>🎉 GOAL MET</h3>
-        <span class='metric-label'>2029 Projection</span><br>
-        <span class='metric-value'>${actual_2029:,.0f}</span><br>
-        <span class='metric-label' style='color:green'>+${gap:,.0f} Surplus</span>
-        </div>
-        """, unsafe_allow_html=True)
-    else:
-        st.markdown(f"""
-        <div class='miss-box'>
-        <h3>⚠️ GAP TO GOAL</h3>
-        <span class='metric-label'>2029 Projection</span><br>
-        <span class='metric-value'>${actual_2029:,.0f}</span><br>
-        <span class='metric-label' style='color:red'>-${abs(gap):,.0f} Shortfall</span>
-        </div>
-        """, unsafe_allow_html=True)
-        
-    st.markdown("### 💡 Tech Revenue Reality")
-    lab_cap = 2080 * utilization * bill_rate
-    ticket_cap = lab_cap / (labor_split_pct/100)
-    parts_cap = ticket_cap - lab_cap
+with c_goal1:
+    gap_26 = yr1['Total Revenue'] - target_2026
+    color_26 = "green" if gap_26 >= 0 else "red"
+    label_26 = "Surplus" if gap_26 >= 0 else "Shortfall"
     
-    st.write(f"**Labor Rev:** ${lab_cap:,.0f}")
-    st.write(f"**+ Attached Parts:** ${parts_cap:,.0f}")
-    st.markdown(f"**= Total Tech Output:** :blue[**${ticket_cap:,.0f}**]")
-    st.caption("Revenue generated by 1 Tech at current utilization/split.")
+    st.markdown(f"""
+    <div style='background-color: {"#e8f5e9" if gap_26 >= 0 else "#ffebee"}; padding: 15px; border-radius: 10px; border-left: 8px solid {color_26}; text-align: center;'>
+    <h4>2026 Performance</h4>
+    <span style='font-size:14px; color:#555;'>Projected</span><br>
+    <span style='font-size:22px; font-weight:bold;'>${yr1['Total Revenue']:,.0f}</span><br>
+    <span style='color:{color_26}; font-weight:bold;'>{'+' if gap_26>=0 else ''}${gap_26:,.0f} {label_26}</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+with c_goal2:
+    gap_29 = yr4['Total Revenue'] - exit_target
+    color_29 = "green" if gap_29 >= 0 else "red"
+    label_29 = "Surplus" if gap_29 >= 0 else "Shortfall"
+    
+    st.markdown(f"""
+    <div style='background-color: {"#e8f5e9" if gap_29 >= 0 else "#ffebee"}; padding: 15px; border-radius: 10px; border-left: 8px solid {color_29}; text-align: center;'>
+    <h4>2029 Exit Status</h4>
+    <span style='font-size:14px; color:#555;'>Projected</span><br>
+    <span style='font-size:22px; font-weight:bold;'>${yr4['Total Revenue']:,.0f}</span><br>
+    <span style='color:{color_29}; font-weight:bold;'>{'+' if gap_29>=0 else ''}${gap_29:,.0f} {label_29}</span>
+    </div>
+    """, unsafe_allow_html=True)
 
 with c_chart:
-    st.subheader("Revenue Path to Exit (With EBITDA Margin)")
-    fig, ax = plt.subplots(figsize=(10, 6))
+    st.subheader("Revenue Path (With Margin)")
+    fig, ax = plt.subplots(figsize=(10, 5))
     
     years = df['Year']
     p1 = ax.bar(years, df['Rev: Labor'], label='Service Labor', color='#1565c0')
@@ -313,27 +315,32 @@ with c_chart:
     p3 = ax.bar(years, df['Rev: S-Jobs'], bottom=df['Rev: Labor']+df['Rev: Job Parts'], label='S-Jobs', color='#ffb74d')
     p4 = ax.bar(years, df['Rev: Spare Parts'], bottom=df['Rev: Labor']+df['Rev: Job Parts']+df['Rev: S-Jobs'], label='Spare Parts', color='#81c784')
     
+    # Data Labels
     for container in ax.containers:
         labels = [f'${v/1000000:.1f}M' if v > 100000 else "" for v in container.datavalues]
         ax.bar_label(container, labels=labels, label_type='center', color='white', fontsize=9, padding=0)
 
+    # EBITDA Line
     ax2 = ax.twinx()
     ax2.plot(years, df['EBITDA %'] * 100, color='#212121', linestyle='-', linewidth=3, marker='o', label='EBITDA Margin')
     ax2.set_ylabel('EBITDA Margin (%)', color='#212121')
     
+    # Legend at bottom
     lines, labels = ax.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax.legend(lines + lines2, labels + labels2, loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=3, frameon=False)
     
-    ax.axhline(y=exit_target, color='red', linestyle='--', linewidth=2, label='Exit Target')
-    ax.text(2026, exit_target, " Exit Target", color='red', va='bottom')
+    # Target Lines
+    ax.axhline(y=exit_target, color='red', linestyle='--', linewidth=2)
+    ax.text(2026.5, exit_target, f" Exit: ${exit_target/1000000:.1f}M", color='red', va='bottom', fontweight='bold')
+    
+    ax.axhline(y=target_2026, color='blue', linestyle=':', linewidth=2)
+    ax.text(2025.6, target_2026, f" 2026 Goal: ${target_2026/1000000:.1f}M", color='blue', va='bottom', fontsize=8)
     
     ax.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
     ax2.yaxis.set_major_formatter(mtick.PercentFormatter(decimals=0))
-    
     ax.spines['top'].set_visible(False)
     plt.tight_layout()
-    
     st.pyplot(fig)
 
 st.divider()
@@ -362,22 +369,11 @@ with tab1:
 with tab2:
     st.markdown("### Resource Path")
     cols = ['Year', 'Techs', 'MEs', 'CEs', 'Progs', 'Locations', 'Sales Reps']
-    
     fmt = {'Year':'{:.0f}', 'Techs':'{:.0f}', 'MEs':'{:.0f}', 'CEs':'{:.0f}', 'Progs':'{:.0f}', 'Locations':'{:.0f}', 'Sales Reps':'{:.0f}'}
-    
     st.dataframe(format_df(df[cols], fmt), use_container_width=True)
 
 with tab3:
-    st.markdown("### Hiring & Operations Audit")
-    cols = ['Year', 'OpEx: Rent', 'OpEx: Central', 'Total Hires']
-    
-    fmt = {'Year':'{:.0f}', 'Total Hires':'{:.0f}', 'OpEx: Rent':'${:,.0f}', 'OpEx: Central':'${:,.0f}'}
-    
+    st.markdown("### Hiring & Operations")
+    cols = ['Year', 'Total Hires', 'OpEx: Hiring', 'Eng FTE']
+    fmt = {'Year':'{:.0f}', 'Total Hires':'{:.0f}', 'OpEx: Hiring':'${:,.0f}', 'Eng FTE':'{:.2f}'}
     st.dataframe(format_df(df[cols], fmt), use_container_width=True)
-    st.markdown(f"""
-    <div class='audit-box'>
-    <b>Rent Rule:</b> HQ Free = {is_hq_free}. You pay for Locs-1.<br>
-    <b>Central Rule:</b> Starts in {central_start_year} AND requires > 1 Location.
-    </div>
-    """, unsafe_allow_html=True)
-
