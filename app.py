@@ -15,6 +15,7 @@ st.markdown("""
     .metric-label {font-size: 14px; color: #555;}
     .metric-value {font-size: 26px; font-weight: bold;}
     .audit-box {background-color: #fff8e1; padding: 15px; border-radius: 5px; border-left: 5px solid #ffc107; font-size: 14px; margin-top: 10px;}
+    .resource-box {background-color: #e3f2fd; padding: 10px; border-radius: 5px; margin-top: 10px; font-size: 12px;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -42,7 +43,6 @@ with st.sidebar:
 
     st.header("3. Revenue Stream B: Job Parts")
     st.caption("Parts attached to service tickets.")
-    # If Parts is 25% of the TOTAL ticket, then Labor is 75%.
     job_parts_pct = st.slider("Parts % of Service Ticket", 0, 50, 25, help="Example: If 25%, then for every $750 of Labor, you sell $250 of Parts.")
     job_parts_margin = st.slider("Job Parts Margin %", 0, 100, 30)
 
@@ -74,7 +74,7 @@ with st.sidebar:
     st.divider()
 
     st.header("6. Costs & Baseline")
-    with st.expander("Operational Details"):
+    with st.expander("Operational Details", expanded=True):
         st.caption("Baseline Staff (Already Hired):")
         base_techs = st.number_input("Base Techs", value=2)
         base_me = st.number_input("Base ME", value=1)
@@ -85,7 +85,7 @@ with st.sidebar:
         cost_tech = st.number_input("Tech Cost ($/hr)", value=85, format="%d")
         cost_eng = st.number_input("Eng Cost ($/hr)", value=95, format="%d")
         
-        # RESTORED INPUT
+        # --- FIXED: THIS VARIABLE IS NOW CONNECTED ---
         techs_per_loc_input = st.number_input("Max Techs per Location", value=6)
         
         rent = st.number_input("Rent ($/mo)", value=5000, format="%d")
@@ -94,9 +94,23 @@ with st.sidebar:
         st.caption("Hiring & Sales:")
         attrition = st.slider("Attrition %", 0, 20, 10)
         hire_cost = st.number_input("Hire Cost ($)", value=12000, format="%d")
+        
+        # --- SALES TRIGGER ---
         sales_trigger = st.number_input("Rev per Sales Rep", value=3000000, format="%d")
+        sales_rep_cost = 120000 # Hardcoded base assumption, could be input
         
         inflation = st.slider("Inflation %", 0, 10, 3) / 100
+        
+        # --- NEW: LIVE DEBUGGER ---
+        st.markdown(f"""
+        <div class='resource-box'>
+        <b>Live Logic Check (Year 1):</b><br>
+        If Rev = ${tm_labor_base+s_job_base+spares_base:,.0f}:<br>
+        - Sales Reps: <b>{math.floor((tm_labor_base+s_job_base+spares_base)/sales_trigger)}</b><br>
+        If Techs = ~{base_techs+2}:<br>
+        - Locations: <b>{math.ceil((base_techs+2)/techs_per_loc_input)}</b>
+        </div>
+        """, unsafe_allow_html=True)
 
 # ==========================================
 # 2. LOGIC ENGINE
@@ -183,10 +197,12 @@ def run_fusion_model():
         prev_total_hc = curr_total_hc
         
         # 5. OPERATIONS
-        # USE THE SLIDER INPUT NOW
+        # --- BUG FIX: Use the variable techs_per_loc_input from sidebar ---
         locs = math.ceil(cum_techs / techs_per_loc_input) 
         
         managers = math.ceil(cum_techs / 10)
+        
+        # --- SALES REP LOGIC ---
         sales_reps = math.floor(total_rev / sales_trigger)
         
         # 6. FINANCIALS
@@ -209,7 +225,7 @@ def run_fusion_model():
         # OpEx
         opex_rent = locs * c_rent_inf * 12
         opex_mgr = managers * (85000 * 1.2 * inf)
-        opex_sales = sales_reps * (120000 * inf)
+        opex_sales = sales_reps * (sales_rep_cost * inf)
         opex_central = (central * 12 * inf) if locs > 1 else 0
         
         # Hiring Cost (Pro-rated for Service Techs only? Or everyone? Let's do Everyone for realism)
