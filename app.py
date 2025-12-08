@@ -281,7 +281,7 @@ with c_goal:
     st.markdown(f"**= Total Tech Output:** :blue[**${ticket_cap:,.0f}**]")
 
 with c_chart:
-    st.subheader("Revenue Path to Exit (With EBITDA)")
+    st.subheader("Revenue Path to Exit (With EBITDA Margin)")
     fig, ax = plt.subplots(figsize=(10, 6))
     
     years = df['Year']
@@ -297,24 +297,28 @@ with c_chart:
         labels = [f'${v/1000000:.1f}M' if v > 100000 else "" for v in container.datavalues]
         ax.bar_label(container, labels=labels, label_type='center', color='white', fontsize=9, padding=0)
 
-    # EBITDA Line on Secondary Axis
+    # EBITDA Line on Secondary Axis (NOW PERCENTAGE)
     ax2 = ax.twinx()
-    ax2.plot(years, df['EBITDA'], color='#212121', linestyle='-', linewidth=3, marker='o', label='EBITDA')
-    ax2.set_ylabel('EBITDA ($)', color='#212121')
+    # Multiply by 100 to make it a whole number percentage
+    ax2.plot(years, df['EBITDA %'] * 100, color='#212121', linestyle='-', linewidth=3, marker='o', label='EBITDA Margin')
+    ax2.set_ylabel('EBITDA Margin (%)', color='#212121')
     
-    # Combined Legend logic
+    # Combined Legend logic - MOVED TO BOTTOM
     lines, labels = ax.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
-    ax.legend(lines + lines2, labels + labels2, loc='upper left', bbox_to_anchor=(1.05, 1))
+    # Place legend below the chart to avoid overlap
+    ax.legend(lines + lines2, labels + labels2, loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=3, frameon=False)
     
     # Target Line
     ax.axhline(y=exit_target, color='red', linestyle='--', linewidth=2, label='Exit Target')
     ax.text(2026, exit_target, " Exit Target", color='red', va='bottom')
     
+    # Format Axes
     ax.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
-    ax2.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
+    ax2.yaxis.set_major_formatter(mtick.PercentFormatter(decimals=0)) # Format as 20%
     
     ax.spines['top'].set_visible(False)
+    plt.tight_layout() # Ensures legend fits
     
     st.pyplot(fig)
 
