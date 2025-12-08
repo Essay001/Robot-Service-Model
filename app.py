@@ -219,7 +219,7 @@ def run_fusion_model():
             "Rev: Labor": curr_labor_target,
             "Rev: Job Parts": curr_job_parts_rev,
             "Rev: S-Jobs": curr_sjob_target,
-            "Rev: Spares": curr_spares_target,
+            "Rev: Spare Parts": curr_spares_target,
             "EBITDA": ebitda,
             "EBITDA %": ebitda/total_rev,
             "Techs": cum_techs,
@@ -281,23 +281,40 @@ with c_goal:
     st.markdown(f"**= Total Tech Output:** :blue[**${ticket_cap:,.0f}**]")
 
 with c_chart:
-    st.subheader("Revenue Path to Exit")
-    fig, ax = plt.subplots(figsize=(10, 5))
+    st.subheader("Revenue Path to Exit (With EBITDA)")
+    fig, ax = plt.subplots(figsize=(10, 6))
     
     years = df['Year']
     # Stacked Bars
     p1 = ax.bar(years, df['Rev: Labor'], label='Service Labor', color='#1565c0')
     p2 = ax.bar(years, df['Rev: Job Parts'], bottom=df['Rev: Labor'], label='Job Parts', color='#64b5f6')
     p3 = ax.bar(years, df['Rev: S-Jobs'], bottom=df['Rev: Labor']+df['Rev: Job Parts'], label='S-Jobs', color='#ffb74d')
-    p4 = ax.bar(years, df['Rev: Spares'], bottom=df['Rev: Labor']+df['Rev: Job Parts']+df['Rev: S-Jobs'], label='Pure Spare Parts', color='#81c784')
+    p4 = ax.bar(years, df['Rev: Spare Parts'], bottom=df['Rev: Labor']+df['Rev: Job Parts']+df['Rev: S-Jobs'], label='Spare Parts', color='#81c784')
+    
+    # Add Data Labels (Compact Millions)
+    for container in ax.containers:
+        # Create labels, but skip if value is 0 or very small
+        labels = [f'${v/1000000:.1f}M' if v > 100000 else "" for v in container.datavalues]
+        ax.bar_label(container, labels=labels, label_type='center', color='white', fontsize=9, padding=0)
+
+    # EBITDA Line on Secondary Axis
+    ax2 = ax.twinx()
+    ax2.plot(years, df['EBITDA'], color='#212121', linestyle='-', linewidth=3, marker='o', label='EBITDA')
+    ax2.set_ylabel('EBITDA ($)', color='#212121')
+    
+    # Combined Legend logic
+    lines, labels = ax.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax.legend(lines + lines2, labels + labels2, loc='upper left', bbox_to_anchor=(1.05, 1))
     
     # Target Line
     ax.axhline(y=exit_target, color='red', linestyle='--', linewidth=2, label='Exit Target')
+    ax.text(2026, exit_target, " Exit Target", color='red', va='bottom')
     
     ax.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
-    ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+    ax2.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
+    
     ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
     
     st.pyplot(fig)
 
@@ -316,10 +333,11 @@ def format_df(d, m): return d.style.format(m)
 
 with tab1:
     st.markdown("### Detailed P&L")
-    cols = ['Year', 'Total Revenue', 'Rev: Labor', 'Rev: Job Parts', 'Rev: S-Jobs', 'Rev: Spares', 
+    cols = ['Year', 'Total Revenue', 'Rev: Labor', 'Rev: Job Parts', 'Rev: S-Jobs', 'Rev: Spare Parts', 
             'Total COGS', 'Total OpEx', 'EBITDA', 'EBITDA %']
     
-    fmt = {'Year':'{:.0f}', 'EBITDA %':'{:.1%}%'}
+    # FIX IS HERE: {:.1%} automatically multiplies by 100
+    fmt = {'Year':'{:.0f}', 'EBITDA %':'{:.1%}'}
     for c in cols:
         if c not in fmt: fmt[c] = "${:,.0f}"
         
@@ -347,5 +365,3 @@ with tab3:
     Includes <b>${hire_cost:,.0f}</b> cost per hire for both Growth and Attrition ({attrition}%).
     </div>
     """, unsafe_allow_html=True)
-
-
