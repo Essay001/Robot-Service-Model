@@ -16,6 +16,7 @@ st.markdown("""
     .metric-value {font-size: 26px; font-weight: bold;}
     .audit-box {background-color: #fff8e1; padding: 15px; border-radius: 5px; border-left: 5px solid #ffc107; font-size: 14px; margin-top: 10px;}
     .resource-box {background-color: #e3f2fd; padding: 10px; border-radius: 5px; margin-top: 10px; font-size: 12px;}
+    .split-box {background-color: #f3f3f3; padding: 10px; border-radius: 5px; margin-top: 5px; margin-bottom: 15px; font-size: 13px;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -32,23 +33,36 @@ with st.sidebar:
 
     st.divider()
 
-    st.header("2. Revenue Stream A: Labor")
-    st.caption("Revenue generated strictly by billing hours.")
-    tm_labor_base = st.number_input("Year 1 Labor Rev ($)", value=2000000, step=100000, format="%d")
-    tm_growth = st.slider("Labor Growth %", 0, 100, 20)
-    bill_rate = st.number_input("Bill Rate ($/hr)", value=210, format="%d")
-    utilization = st.slider("Tech Utilization %", 50, 100, 80) / 100
+    # --- NEW COMBINED SECTION ---
+    st.header("2. Service Revenue (Labor + Job Parts)")
+    st.caption("Total T&M Service Revenue including attached parts.")
+    
+    tm_service_base = st.number_input("Year 1 Total Service Rev ($)", value=2500000, step=100000, format="%d")
+    tm_growth = st.slider("Service Growth %", 0, 100, 20)
+    
+    st.subheader("Revenue Split")
+    labor_split_pct = st.slider("Split: % from Labor", 0, 100, 75, help="The remaining % is automatically Job Parts.")
+    
+    # Calculate Split for Display
+    disp_labor = tm_service_base * (labor_split_pct/100)
+    disp_parts = tm_service_base * (1 - (labor_split_pct/100))
+    
+    st.markdown(f"""
+    <div class='split-box'>
+    <b>Year 1 Breakdown:</b><br>
+    🛠️ Labor: <b>${disp_labor:,.0f}</b><br>
+    ⚙️ Job Parts: <b>${disp_parts:,.0f}</b>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.expander("Service Settings (Margins/Rates)"):
+        bill_rate = st.number_input("Bill Rate ($/hr)", value=210, format="%d")
+        utilization = st.slider("Tech Utilization %", 50, 100, 80) / 100
+        job_parts_margin = st.slider("Job Parts Margin %", 0, 100, 30)
 
     st.divider()
 
-    st.header("3. Revenue Stream B: Job Parts")
-    st.caption("Parts attached to service tickets.")
-    job_parts_pct = st.slider("Parts % of Service Ticket", 0, 50, 25, help="Example: If 25%, then for every $750 of Labor, you sell $250 of Parts.")
-    job_parts_margin = st.slider("Job Parts Margin %", 0, 100, 30)
-
-    st.divider()
-
-    st.header("4. Revenue Stream C: S-Jobs")
+    st.header("3. Revenue Stream C: S-Jobs")
     st.caption("Fixed Bid Projects.")
     s_job_base = st.number_input("Year 1 S-Job Rev ($)", value=1000000, step=100000, format="%d")
     s_job_growth = st.slider("S-Job Growth %", 0, 100, 15)
@@ -65,7 +79,7 @@ with st.sidebar:
 
     st.divider()
 
-    st.header("5. Revenue Stream D: Spare Parts")
+    st.header("4. Revenue Stream D: Spare Parts")
     st.caption("Pure Box Sales (No Labor).")
     spares_base = st.number_input("Year 1 Spare Parts Rev ($)", value=500000, step=50000, format="%d")
     spares_growth = st.slider("Spare Parts Growth %", 0, 100, 10)
@@ -73,7 +87,7 @@ with st.sidebar:
 
     st.divider()
 
-    st.header("6. Costs & Baseline")
+    st.header("5. Costs & Baseline")
     with st.expander("Operational Details", expanded=True):
         st.caption("Baseline Staff (Already Hired):")
         base_techs = st.number_input("Base Techs", value=2)
@@ -85,7 +99,6 @@ with st.sidebar:
         cost_tech = st.number_input("Tech Cost ($/hr)", value=85, format="%d")
         cost_eng = st.number_input("Eng Cost ($/hr)", value=95, format="%d")
         
-        # --- FIXED: THIS VARIABLE IS NOW CONNECTED ---
         techs_per_loc_input = st.number_input("Max Techs per Location", value=6)
         
         rent = st.number_input("Rent ($/mo)", value=5000, format="%d")
@@ -94,21 +107,16 @@ with st.sidebar:
         st.caption("Hiring & Sales:")
         attrition = st.slider("Attrition %", 0, 20, 10)
         hire_cost = st.number_input("Hire Cost ($)", value=12000, format="%d")
-        
-        # --- SALES TRIGGER ---
         sales_trigger = st.number_input("Rev per Sales Rep", value=3000000, format="%d")
-        sales_rep_cost = 120000 # Hardcoded base assumption, could be input
+        sales_rep_cost = 120000
         
         inflation = st.slider("Inflation %", 0, 10, 3) / 100
         
-        # --- NEW: LIVE DEBUGGER ---
         st.markdown(f"""
         <div class='resource-box'>
         <b>Live Logic Check (Year 1):</b><br>
-        If Rev = ${tm_labor_base+s_job_base+spares_base:,.0f}:<br>
-        - Sales Reps: <b>{math.floor((tm_labor_base+s_job_base+spares_base)/sales_trigger)}</b><br>
-        If Techs = ~{base_techs+2}:<br>
-        - Locations: <b>{math.ceil((base_techs+2)/techs_per_loc_input)}</b>
+        Total Rev: <b>${tm_service_base+s_job_base+spares_base:,.0f}</b><br>
+        Sales Reps: <b>{math.floor((tm_service_base+s_job_base+spares_base)/sales_trigger)}</b><br>
         </div>
         """, unsafe_allow_html=True)
 
@@ -121,7 +129,8 @@ def run_fusion_model():
     data = []
     
     # Growth Trackers
-    curr_labor_target = tm_labor_base
+    # Now we track TOTAL Service, then split it later
+    curr_service_target = tm_service_base
     curr_sjob_target = s_job_base
     curr_spares_target = spares_base
     
@@ -145,15 +154,14 @@ def run_fusion_model():
         
         # 2. CALCULATE REVENUE STREAMS
         if i > 0:
-            curr_labor_target = curr_labor_target * (1 + tm_growth/100)
+            curr_service_target = curr_service_target * (1 + tm_growth/100)
             curr_sjob_target = curr_sjob_target * (1 + s_job_growth/100)
             curr_spares_target = curr_spares_target * (1 + spares_growth/100)
             
-        # Logic B: Job Parts (Attach Rate)
-        # Total Ticket = Labor / (1 - Parts%)
-        # Parts = Total - Labor
-        total_ticket_rev = curr_labor_target / (1 - (job_parts_pct/100))
-        curr_job_parts_rev = total_ticket_rev - curr_labor_target
+        # SPLIT SERVICE REVENUE (LABOR vs PARTS)
+        # Based on the slider percentage
+        curr_labor_target = curr_service_target * (labor_split_pct / 100)
+        curr_job_parts_rev = curr_service_target * (1 - (labor_split_pct / 100))
         
         # Total Top Line
         total_rev = curr_labor_target + curr_job_parts_rev + curr_sjob_target + curr_spares_target
@@ -197,12 +205,9 @@ def run_fusion_model():
         prev_total_hc = curr_total_hc
         
         # 5. OPERATIONS
-        # --- BUG FIX: Use the variable techs_per_loc_input from sidebar ---
         locs = math.ceil(cum_techs / techs_per_loc_input) 
         
         managers = math.ceil(cum_techs / 10)
-        
-        # --- SALES REP LOGIC ---
         sales_reps = math.floor(total_rev / sales_trigger)
         
         # 6. FINANCIALS
@@ -227,8 +232,6 @@ def run_fusion_model():
         opex_mgr = managers * (85000 * 1.2 * inf)
         opex_sales = sales_reps * (sales_rep_cost * inf)
         opex_central = (central * 12 * inf) if locs > 1 else 0
-        
-        # Hiring Cost (Pro-rated for Service Techs only? Or everyone? Let's do Everyone for realism)
         opex_hire = total_hires * c_hire_inf
         
         total_opex = opex_rent + opex_mgr + opex_sales + opex_central + opex_hire
@@ -295,13 +298,15 @@ with c_goal:
     st.markdown("### 💡 Tech Revenue Reality")
     # Single Tech Capacity Math
     lab_cap = 2080 * utilization * bill_rate
-    # If Labor is 75% of Ticket (Parts 25%), Ticket = Labor / 0.75
-    ticket_cap = lab_cap / (1 - (job_parts_pct/100))
+    # Total Ticket (Derived from Labor Split)
+    # If Labor is 75% of ticket... Ticket = Labor / 0.75
+    ticket_cap = lab_cap / (labor_split_pct/100)
     parts_cap = ticket_cap - lab_cap
     
     st.write(f"**Labor Rev:** ${lab_cap:,.0f}")
     st.write(f"**+ Attached Parts:** ${parts_cap:,.0f}")
     st.markdown(f"**= Total Tech Output:** :blue[**${ticket_cap:,.0f}**]")
+    st.caption("Revenue generated by 1 Tech at current utilization/split.")
 
 with c_chart:
     st.subheader("Revenue Path to Exit (With EBITDA Margin)")
@@ -322,14 +327,12 @@ with c_chart:
 
     # EBITDA Line on Secondary Axis (NOW PERCENTAGE)
     ax2 = ax.twinx()
-    # Multiply by 100 to make it a whole number percentage
     ax2.plot(years, df['EBITDA %'] * 100, color='#212121', linestyle='-', linewidth=3, marker='o', label='EBITDA Margin')
     ax2.set_ylabel('EBITDA Margin (%)', color='#212121')
     
     # Combined Legend logic - MOVED TO BOTTOM
     lines, labels = ax.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
-    # Place legend below the chart to avoid overlap
     ax.legend(lines + lines2, labels + labels2, loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=3, frameon=False)
     
     # Target Line
@@ -338,10 +341,10 @@ with c_chart:
     
     # Format Axes
     ax.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
-    ax2.yaxis.set_major_formatter(mtick.PercentFormatter(decimals=0)) # Format as 20%
+    ax2.yaxis.set_major_formatter(mtick.PercentFormatter(decimals=0))
     
     ax.spines['top'].set_visible(False)
-    plt.tight_layout() # Ensures legend fits
+    plt.tight_layout()
     
     st.pyplot(fig)
 
@@ -363,7 +366,6 @@ with tab1:
     cols = ['Year', 'Total Revenue', 'Rev: Labor', 'Rev: Job Parts', 'Rev: S-Jobs', 'Rev: Spare Parts', 
             'Total COGS', 'Total OpEx', 'EBITDA', 'EBITDA %']
     
-    # FIX IS HERE: {:.1%} automatically multiplies by 100
     fmt = {'Year':'{:.0f}', 'EBITDA %':'{:.1%}'}
     for c in cols:
         if c not in fmt: fmt[c] = "${:,.0f}"
