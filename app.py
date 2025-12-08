@@ -319,7 +319,7 @@ with tab1:
     cols = ['Year', 'Total Revenue', 'Rev: Labor', 'Rev: Job Parts', 'Rev: S-Jobs', 'Rev: Spares', 
             'Total COGS', 'Total OpEx', 'EBITDA', 'EBITDA %']
     
-    fmt = {'Year':'{:.0f}', 'EBITDA %':'{:.1f}%'}
+    fmt = {'Year':'{:.0f}', 'EBITDA %':'{:.1%}%'}
     for c in cols:
         if c not in fmt: fmt[c] = "${:,.0f}"
         
@@ -347,3 +347,4 @@ with tab3:
     Includes <b>${hire_cost:,.0f}</b> cost per hire for both Growth and Attrition ({attrition}%).
     </div>
     """, unsafe_allow_html=True)
+
