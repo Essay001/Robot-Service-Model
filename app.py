@@ -22,7 +22,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🚀 2029 Strategic Exit Model")
-st.markdown("The complete business plan: **Revenue Waterfall**, **Full P&L**, **Attrition**, and **Net Income Estimates**.")
+st.markdown("The complete business plan: **4-Stream Revenue**, **Resource Loading**, **Attrition**, and **Audit Trails**.")
 
 # ==========================================
 # 1. SIDEBAR: THE CONTROL TOWER
@@ -39,10 +39,10 @@ with st.sidebar:
     # --- REVENUE INPUTS ---
     st.header("2. Service Revenue (Labor + Job Parts)")
     tm_service_base = st.number_input("Year 1 Total Service Rev ($)", value=1500000, step=100000, format="%d")
-    tm_growth = st.slider("Service Growth %", 0, 100, 20)
+    tm_growth = st.number_input("Service Growth %", value=20, step=1, min_value=0, max_value=100)
     
     st.subheader("Revenue Split")
-    labor_split_pct = st.slider("Split: % from Labor", 0, 100, 75)
+    labor_split_pct = st.number_input("Split: % from Labor", value=75, step=1, min_value=0, max_value=100)
     
     disp_labor = tm_service_base * (labor_split_pct/100)
     disp_parts = tm_service_base * (1 - (labor_split_pct/100))
@@ -50,18 +50,21 @@ with st.sidebar:
     
     with st.expander("Service Settings"):
         bill_rate = st.number_input("Bill Rate ($/hr)", value=210, format="%d")
-        utilization = st.slider("Tech Utilization %", 50, 100, 80) / 100
-        job_parts_margin = st.slider("Job Parts Margin %", 0, 100, 30)
+        utilization_pct = st.number_input("Tech Utilization %", value=80, step=1, min_value=10, max_value=100)
+        utilization = utilization_pct / 100
+        job_parts_margin = st.number_input("Job Parts Margin %", value=30, step=1, min_value=0, max_value=100)
 
     st.divider()
 
     st.header("3. S-Jobs (Projects)")
     s_job_base = st.number_input("Year 1 S-Job Rev ($)", value=1000000, step=100000, format="%d")
-    s_job_growth = st.slider("S-Job Growth %", 0, 100, 15)
+    s_job_growth = st.number_input("S-Job Growth %", value=15, step=1, min_value=0, max_value=100)
     
     with st.expander("S-Job Settings"):
-        sj_mat_pct = st.slider("S-Job Mat Cost %", 0, 100, 50)
-        sj_lab_pct = st.slider("S-Job Labor Cost %", 0, 100, 30)
+        sj_mat_pct = st.number_input("S-Job Mat Cost %", value=50, step=1)
+        sj_lab_pct = st.number_input("S-Job Labor Cost %", value=30, step=1)
+        
+        st.caption("Resource Split (Labor Portion):")
         c1, c2 = st.columns(2)
         w_tech = c1.number_input("Tech %", value=20, format="%d")/100
         w_me = c2.number_input("ME %", value=40, format="%d")/100
@@ -71,19 +74,20 @@ with st.sidebar:
     st.divider()
 
     st.header("4. Spare Parts (Direct)")
-    spares_base = st.number_input("Year 1 Spare Parts Rev ($)", value=150000, step=50000, format="%d")
-    spares_growth = st.slider("Spare Parts Growth %", 0, 100, 10)
-    spares_margin = st.slider("Spare Parts Margin %", 0, 100, 35)
+    spares_base = st.number_input("Year 1 Spare Parts Rev ($)", value=150000, step=10000, format="%d")
+    spares_growth = st.number_input("Spare Parts Growth %", value=10, step=1, min_value=0, max_value=100)
+    spares_margin = st.number_input("Spare Parts Margin %", value=35, step=1, min_value=0, max_value=100)
 
     st.divider()
 
     st.header("5. Costs & Baseline")
     with st.expander("Operational Details", expanded=True):
         st.caption("Baseline Staff (Already Hired):")
-        base_techs = st.number_input("Base Techs", value=2)
-        base_me = st.number_input("Base ME", value=1)
-        base_ce = st.number_input("Base CE", value=1)
-        base_prog = st.number_input("Base Prog", value=1)
+        c_h1, c_h2 = st.columns(2)
+        base_techs = c_h1.number_input("Base Techs", value=2)
+        base_me = c_h2.number_input("Base ME", value=1)
+        base_ce = c_h1.number_input("Base CE", value=1)
+        base_prog = c_h2.number_input("Base Prog", value=1)
         
         st.caption("Costs:")
         cost_tech = st.number_input("Tech Cost ($/hr)", value=85, format="%d")
@@ -98,17 +102,18 @@ with st.sidebar:
         is_hq_free = st.checkbox("Is HQ Rent Free?", value=True, help="If checked, you only pay rent for Location 2, 3, etc.")
         
         central_cost = st.number_input("Central Support ($/mo)", value=8000, format="%d")
-        central_start_year = st.selectbox("Start Central Support In:", [2026, 2027, 2028, 2029], index=1)
+        central_start_year = st.selectbox("Start Central Support In:", [2026, 2027, 2028, 2029], index=1, help="Defers corporate allocations until this year.")
         
         st.markdown("---")
         
         st.caption("Hiring & Sales:")
-        attrition = st.slider("Attrition %", 0, 20, 10)
+        attrition = st.number_input("Attrition %", value=10, step=1, min_value=0)
         hire_cost = st.number_input("Hire Cost ($)", value=12000, format="%d")
         sales_trigger = st.number_input("Rev per Sales Rep", value=3000000, format="%d")
         sales_rep_cost = 120000
         
-        inflation = st.slider("Inflation %", 0, 10, 3) / 100
+        inflation_pct = st.number_input("Inflation %", value=3.0, step=0.5)
+        inflation = inflation_pct / 100
         
         # Live calc of 2026 Total
         total_2026_input = tm_service_base + s_job_base + spares_base
@@ -122,12 +127,12 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
 
-    # --- NEW: BELOW THE LINE ---
+    # --- BELOW THE LINE ---
     st.header("6. Below the Line (Estimates)")
     st.caption("Deductions from EBITDA to get Net Income.")
     depreciation_pct = st.number_input("Depreciation (% of Rev)", value=1.5, step=0.5)
     interest_expense = st.number_input("Annual Interest Exp ($)", value=0, step=10000, format="%d")
-    tax_rate = st.slider("Tax Rate %", 0, 40, 25)
+    tax_rate = st.number_input("Tax Rate %", value=25, step=1, min_value=0, max_value=50)
 
 # ==========================================
 # 2. LOGIC ENGINE
@@ -271,11 +276,18 @@ def run_fusion_model():
             "EBITDA Margin %": ebitda/total_rev,
             "Net Income": net_income,
             "Net Margin %": net_income/total_rev,
-            # DETAILS
+            # DETAILS (RESTORED KEYS)
             "Techs": cum_techs,
+            "MEs": cum_me,
+            "CEs": cum_ce,
+            "Progs": cum_prog,
             "Locations": locs,
             "Sales Reps": sales_reps,
+            "Total Hires": total_hires,
             "OpEx: Hiring": opex_hire,
+            "Eng FTE": total_eng_fte,
+            "OpEx: Rent": opex_rent,
+            "OpEx: Central": central_fee,
             "Total COGS": total_cogs,
             "Total OpEx": total_opex,
             # BTL
@@ -434,3 +446,9 @@ with tab3:
     cols = ['Year', 'Total Hires', 'OpEx: Hiring', 'OpEx: Rent', 'OpEx: Central']
     fmt = {'Year':'{:.0f}', 'Total Hires':'{:.0f}', 'OpEx: Hiring':'${:,.0f}', 'OpEx: Rent':'${:,.0f}', 'OpEx: Central':'${:,.0f}'}
     st.dataframe(format_df(df[cols], fmt), use_container_width=True)
+    st.markdown(f"""
+    <div class='audit-box'>
+    <b>Rent Rule:</b> HQ Free = {is_hq_free}. You pay for Locs-1.<br>
+    <b>Central Rule:</b> Starts in {central_start_year} AND requires > 1 Location.
+    </div>
+    """, unsafe_allow_html=True)
