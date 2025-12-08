@@ -43,7 +43,11 @@ with st.sidebar:
     st.info("Hiring expensive veterans.")
     rebadge_cost = st.number_input("Rebadge Tech Cost (Burdened) $", value=170000, step=5000, min_value=100000, max_value=250000)
     rebadge_ramp = st.slider("Rebadge Ramp (Months)", 0, 12, 1)
-    rebadge_cadence = st.selectbox("Hiring Cadence", ["Every 6 Months (2/yr)", "Every 4 Months (3/yr)", "Every 3 Months (4/yr)"])
+    
+    # Simplified Selectbox for cleaner text parsing later
+    cadence_options = {"Every 6 Months (2/yr)": 6, "Every 4 Months (3/yr)": 4, "Every 3 Months (4/yr)": 3}
+    rebadge_cadence_label = st.selectbox("Hiring Cadence", list(cadence_options.keys()))
+    rebadge_interval = cadence_options[rebadge_cadence_label]
     
     st.markdown("---")
     st.markdown("**Revenue Economics**")
@@ -67,8 +71,6 @@ def run_comparison():
     # -- SCENARIO A: STANDARD ORGANIC --
     org_data = []
     base_monthly = base_rev_2025 / 12
-    
-    # Dynamic Parts Cost (Linked to Revenue Input)
     tech_parts_cost = rev_per_tech * parts_ratio
     
     cum_green_hires = 0
@@ -79,7 +81,6 @@ def run_comparison():
             cum_green_hires += 1
             
         year_idx = (m-1) // 12
-        # Use Slider for Base Growth
         growth_factor = (1 + (base_growth_pct/100)) ** year_idx
         rev_base = base_monthly * growth_factor
         
@@ -100,8 +101,6 @@ def run_comparison():
                 
                 tech_monthly_rev = (rev_per_tech / 12) * pct
                 hire_rev_total += tech_monthly_rev
-                
-                # Variable Parts Cost follows Revenue
                 hire_parts_cost += (tech_parts_cost / 12) * pct
                 
         total_rev = rev_base + hire_rev_total
@@ -114,9 +113,8 @@ def run_comparison():
         
     # -- SCENARIO B: REBADGE --
     reb_data = []
-    if "6 Months" in rebadge_cadence: interval_r = 6
-    elif "4 Months" in rebadge_cadence: interval_r = 4
-    else: interval_r = 3
+    # Use the interval parsed from the dictionary above
+    interval_r = rebadge_interval
     
     cum_reb_hires = 0
     
@@ -180,7 +178,7 @@ with c1:
     st.markdown(f"""
     <div class='org-box'>
     <h3>🐢 Scenario A: Standard Hiring</h3>
-    <p>Hire {green_hires_yr}/yr at ${green_cost/1000:.0f}k cost.</p>
+    <p>Hire <b>{green_hires_yr}/yr</b> at <b>${green_cost/1000:.0f}k</b> cost.</p>
     <hr>
     <span class='risk-metric'>${rr_org_rev/1000000:.1f}M</span> 2029 Revenue<br>
     <span class='risk-metric'>${rr_org_ebitda/1000000:.1f}M</span> 2029 EBITDA<br>
@@ -193,7 +191,7 @@ with c2:
     st.markdown(f"""
     <div class='rebadge-box'>
     <h3>🐇 Scenario B: Rebadge Strategy</h3>
-    <p>Hire 1 every {rebadge_cadence.split(' ')[2]} at ${rebadge_cost/1000:.0f}k cost.</p>
+    <p>Hire <b>1 every {rebadge_interval} Mo</b> at <b>${rebadge_cost/1000:.0f}k</b> cost.</p>
     <hr>
     <span class='risk-metric'>${rr_reb_rev/1000000:.1f}M</span> 2029 Revenue<br>
     <span class='risk-metric'>${rr_reb_ebitda/1000000:.1f}M</span> 2029 EBITDA<br>
@@ -237,4 +235,4 @@ with c_chart2:
     ax2.grid(True, alpha=0.3)
     st.pyplot(fig2)
 
-st.info("💡 **Strategy:** The Orange Line (Rebadge) only drops below the Blue Line if you push salaries excessively high. At **$170k burdened ($130k salary)**, Rebadge is still vastly superior.")
+st.info("💡 **Strategy:** The Orange Line (Rebadge) stays above the Blue Line because you never pay for 'Dead Time' (Ramp Up). The higher salary is easily offset by the immediate revenue.")
