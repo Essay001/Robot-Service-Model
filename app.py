@@ -22,7 +22,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🚀 2029 Strategic Exit Model")
-st.markdown("The complete business plan: **4-Stream Revenue**, **Resource Loading**, **Attrition**, and **Audit Trails**.")
+st.markdown("The complete business plan: **Revenue Waterfall**, **Full P&L**, **Attrition**, and **Net Income Estimates**.")
 
 # ==========================================
 # 1. SIDEBAR: THE CONTROL TOWER
@@ -38,7 +38,6 @@ with st.sidebar:
 
     # --- REVENUE INPUTS ---
     st.header("2. Service Revenue (Labor + Job Parts)")
-    # UPDATED DEFAULT: 1,500,000
     tm_service_base = st.number_input("Year 1 Total Service Rev ($)", value=1500000, step=100000, format="%d")
     tm_growth = st.slider("Service Growth %", 0, 100, 20)
     
@@ -72,7 +71,6 @@ with st.sidebar:
     st.divider()
 
     st.header("4. Spare Parts (Direct)")
-    # UPDATED DEFAULT: 150,000
     spares_base = st.number_input("Year 1 Spare Parts Rev ($)", value=150000, step=50000, format="%d")
     spares_growth = st.slider("Spare Parts Growth %", 0, 100, 10)
     spares_margin = st.slider("Spare Parts Margin %", 0, 100, 35)
@@ -89,10 +87,8 @@ with st.sidebar:
         
         st.caption("Costs:")
         cost_tech = st.number_input("Tech Cost ($/hr)", value=85, format="%d")
-        # UPDATED DEFAULT: 85
         cost_eng = st.number_input("Eng Cost ($/hr)", value=85, format="%d")
         
-        # UPDATED DEFAULT: 4
         techs_per_loc_input = st.number_input("Max Techs per Location", value=4)
         
         # --- TIMING SECTION ---
@@ -102,7 +98,7 @@ with st.sidebar:
         is_hq_free = st.checkbox("Is HQ Rent Free?", value=True, help="If checked, you only pay rent for Location 2, 3, etc.")
         
         central_cost = st.number_input("Central Support ($/mo)", value=8000, format="%d")
-        central_start_year = st.selectbox("Start Central Support In:", [2026, 2027, 2028, 2029], index=1, help="Defers corporate allocations until this year.")
+        central_start_year = st.selectbox("Start Central Support In:", [2026, 2027, 2028, 2029], index=1)
         
         st.markdown("---")
         
@@ -125,6 +121,13 @@ with st.sidebar:
         Gap: <b style='color:{"green" if total_2026_input >= target_2026 else "red"}'>${total_2026_input - target_2026:,.0f}</b>
         </div>
         """, unsafe_allow_html=True)
+
+    # --- NEW: BELOW THE LINE ---
+    st.header("6. Below the Line (Estimates)")
+    st.caption("Deductions from EBITDA to get Net Income.")
+    depreciation_pct = st.number_input("Depreciation (% of Rev)", value=1.5, step=0.5)
+    interest_expense = st.number_input("Annual Interest Exp ($)", value=0, step=10000, format="%d")
+    tax_rate = st.slider("Tax Rate %", 0, 40, 25)
 
 # ==========================================
 # 2. LOGIC ENGINE
@@ -210,7 +213,7 @@ def run_fusion_model():
         managers = math.ceil(cum_techs / 10)
         sales_reps = math.floor(total_rev / sales_trigger)
         
-        # 6. FINANCIALS
+        # 6. FINANCIALS (OPERATING)
         
         # COGS
         cogs_labor_tech = cum_techs * 2080 * c_tech_inf
@@ -224,7 +227,7 @@ def run_fusion_model():
         total_cogs = cogs_labor_tech + cogs_labor_eng + cogs_job_parts + cogs_spares + cogs_sjob_mat
         gross_profit = total_rev - total_cogs
         
-        # OpEx: RENT LOGIC
+        # OpEx
         if is_hq_free:
             billable_locs = max(0, locs - 1)
         else:
@@ -232,7 +235,6 @@ def run_fusion_model():
             
         opex_rent = billable_locs * c_rent_inf * 12
         
-        # OpEx: CENTRAL SUPPORT
         if year >= central_start_year and locs > 1:
             central_fee = central_cost * 12 * inf
         else:
@@ -244,7 +246,16 @@ def run_fusion_model():
         
         total_opex = opex_rent + opex_mgr + opex_sales + central_fee + opex_hire
         
+        # 7. EBITDA (OPERATING PROFIT)
         ebitda = gross_profit - total_opex
+        
+        # 8. BELOW THE LINE (NET INCOME)
+        da_cost = total_rev * (depreciation_pct / 100)
+        ebit = ebitda - da_cost
+        interest = interest_expense
+        ebt = ebit - interest
+        taxes = ebt * (tax_rate / 100) if ebt > 0 else 0
+        net_income = ebt - taxes
         
         data.append({
             "Year": year,
@@ -253,20 +264,24 @@ def run_fusion_model():
             "Rev: Job Parts": curr_job_parts_rev,
             "Rev: S-Jobs": curr_sjob_target,
             "Rev: Spare Parts": curr_spares_target,
+            # MARGINS
+            "Gross Profit": gross_profit,
+            "Gross Margin %": gross_profit/total_rev,
             "EBITDA": ebitda,
-            "EBITDA %": ebitda/total_rev,
+            "EBITDA Margin %": ebitda/total_rev,
+            "Net Income": net_income,
+            "Net Margin %": net_income/total_rev,
+            # DETAILS
             "Techs": cum_techs,
-            "MEs": cum_me,
-            "CEs": cum_ce,
-            "Progs": cum_prog,
-            "Total Hires": total_hires,
             "Locations": locs,
             "Sales Reps": sales_reps,
-            "OpEx: Rent": opex_rent,
-            "OpEx: Central": central_fee,
-            "OpEx: Hiring": opex_hire, # Renamed to standard key
+            "OpEx: Hiring": opex_hire,
             "Total COGS": total_cogs,
-            "Total OpEx": total_opex
+            "Total OpEx": total_opex,
+            # BTL
+            "D&A": da_cost,
+            "Interest": interest,
+            "Taxes": taxes
         })
         
     return pd.DataFrame(data)
@@ -277,7 +292,6 @@ df = run_fusion_model()
 # 3. TOP ROW: SCORECARDS (Side-by-Side)
 # ==========================================
 
-# Compare 2026 (Row 0) and 2029 (Row 3)
 yr1 = df.iloc[0]
 yr4 = df.iloc[-1]
 
@@ -312,7 +326,6 @@ with c2:
     """, unsafe_allow_html=True)
 
 with c3:
-    # Single Tech Capacity Math
     lab_cap = 2080 * utilization * bill_rate
     ticket_cap = lab_cap / (labor_split_pct/100)
     parts_cap = ticket_cap - lab_cap
@@ -349,7 +362,7 @@ for container in ax.containers:
 
 # EBITDA Line on Secondary Axis (NOW PERCENTAGE)
 ax2 = ax.twinx()
-ax2.plot(years, df['EBITDA %'] * 100, color='#212121', linestyle='-', linewidth=3, marker='o', label='EBITDA Margin')
+ax2.plot(years, df['EBITDA Margin %'] * 100, color='#212121', linestyle='-', linewidth=3, marker='o', label='EBITDA Margin')
 ax2.set_ylabel('EBITDA Margin (%)', color='#212121')
 
 # Combined Legend logic - MOVED TO BOTTOM
@@ -381,20 +394,34 @@ st.divider()
 
 st.subheader("🔍 Audit Center")
 
-tab1, tab2, tab3 = st.tabs(["💰 P&L Detail", "👥 Headcount Path", "📊 Hiring & Ops"])
+tab1, tab2, tab3 = st.tabs(["💰 Detailed P&L Waterfall", "👥 Headcount Path", "📊 Hiring & Ops"])
 
 def format_df(d, m): return d.style.format(m)
 
 with tab1:
-    st.markdown("### Detailed P&L")
-    cols = ['Year', 'Total Revenue', 'Rev: Labor', 'Rev: Job Parts', 'Rev: S-Jobs', 'Rev: Spare Parts', 
-            'Total COGS', 'Total OpEx', 'EBITDA', 'EBITDA %']
+    st.markdown("### P&L Statement (The Waterfall)")
+    st.info("Here is the progression from Revenue -> EBITDA -> Net Income.")
     
-    fmt = {'Year':'{:.0f}', 'EBITDA %':'{:.1%}'}
-    for c in cols:
+    # Selecting columns in logical P&L order
+    cols_pl = ['Year', 
+               'Total Revenue', 
+               'Total COGS', 
+               'Gross Profit', 
+               'Total OpEx', 
+               'EBITDA', 'EBITDA Margin %',
+               'D&A', 'Interest', 'Taxes',
+               'Net Income', 'Net Margin %']
+    
+    fmt = {
+        'Year': '{:.0f}', 
+        'EBITDA Margin %': '{:.1%}', 
+        'Net Margin %': '{:.1%}'
+    }
+    # Currency format for the rest
+    for c in cols_pl:
         if c not in fmt: fmt[c] = "${:,.0f}"
         
-    st.dataframe(format_df(df[cols], fmt), use_container_width=True)
+    st.dataframe(format_df(df[cols_pl], fmt), use_container_width=True)
 
 with tab2:
     st.markdown("### Resource Path")
@@ -404,15 +431,6 @@ with tab2:
 
 with tab3:
     st.markdown("### Hiring & Operations Audit")
-    # Updated keys to match exactly what is in data.append
     cols = ['Year', 'Total Hires', 'OpEx: Hiring', 'OpEx: Rent', 'OpEx: Central']
-    
     fmt = {'Year':'{:.0f}', 'Total Hires':'{:.0f}', 'OpEx: Hiring':'${:,.0f}', 'OpEx: Rent':'${:,.0f}', 'OpEx: Central':'${:,.0f}'}
-    
     st.dataframe(format_df(df[cols], fmt), use_container_width=True)
-    st.markdown(f"""
-    <div class='audit-box'>
-    <b>Rent Rule:</b> HQ Free = {is_hq_free}. You pay for Locs-1.<br>
-    <b>Central Rule:</b> Starts in {central_start_year} AND requires > 1 Location.
-    </div>
-    """, unsafe_allow_html=True)
