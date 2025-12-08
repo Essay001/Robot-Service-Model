@@ -170,4 +170,5 @@ def run_fusion_model():
         # Eng
         new_me = max(0, req_me - cum_me)
         cum_me = max(cum_me, req_me)
-        new_ce = max(0,
+        new_ce = max(0,)
+
