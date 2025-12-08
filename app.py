@@ -29,13 +29,13 @@ st.markdown("The complete business plan: **4-Stream Revenue**, **Resource Loadin
 
 with st.sidebar:
     st.header("1. The Exit Goal")
-    exit_target = st.number_input("2029 Revenue Target ($)", value=7500000, step=250000, format="%d")
+    exit_target = st.number_input("2029 Revenue Target ($)", value=3500000, step=250000, format="%d")
 
     st.divider()
 
     # --- REVENUE INPUTS ---
     st.header("2. Service Revenue (Labor + Job Parts)")
-    tm_service_base = st.number_input("Year 1 Total Service Rev ($)", value=2500000, step=100000, format="%d")
+    tm_service_base = st.number_input("Year 1 Total Service Rev ($)", value=1500000, step=100000, format="%d")
     tm_growth = st.slider("Service Growth %", 0, 100, 20)
     
     st.subheader("Revenue Split")
@@ -68,7 +68,7 @@ with st.sidebar:
     st.divider()
 
     st.header("4. Spare Parts (Direct)")
-    spares_base = st.number_input("Year 1 Spares Rev ($)", value=500000, step=50000, format="%d")
+    spares_base = st.number_input("Year 1 Spares Rev ($)", value=150000, step=50000, format="%d")
     spares_growth = st.slider("Spare Parts Growth %", 0, 100, 10)
     spares_margin = st.slider("Spare Parts Margin %", 0, 100, 35)
 
@@ -84,7 +84,7 @@ with st.sidebar:
         
         st.caption("Costs:")
         cost_tech = st.number_input("Tech Cost ($/hr)", value=85, format="%d")
-        cost_eng = st.number_input("Eng Cost ($/hr)", value=95, format="%d")
+        cost_eng = st.number_input("Eng Cost ($/hr)", value=85, format="%d")
         
         techs_per_loc_input = st.number_input("Max Techs per Location", value=6)
         
@@ -102,7 +102,7 @@ with st.sidebar:
         st.caption("Hiring & Sales:")
         attrition = st.slider("Attrition %", 0, 20, 10)
         hire_cost = st.number_input("Hire Cost ($)", value=12000, format="%d")
-        sales_trigger = st.number_input("Rev per Sales Rep", value=3000000, format="%d")
+        sales_trigger = st.number_input("Rev per Sales Rep", value=5000000, format="%d")
         sales_rep_cost = 120000
         
         inflation = st.slider("Inflation %", 0, 10, 3) / 100
@@ -380,3 +380,4 @@ with tab3:
     <b>Central Rule:</b> Starts in {central_start_year} AND requires > 1 Location.
     </div>
     """, unsafe_allow_html=True)
+
