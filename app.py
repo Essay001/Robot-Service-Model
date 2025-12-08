@@ -22,7 +22,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🚀 2029 Strategic Exit Model")
-st.markdown("The complete business plan: **4-Stream Revenue**, **Resource Loading**, **Attrition**, and **Audit Trails**.")
+st.markdown("The complete business plan: **Actuals (2025)** + **Projections (2026-2029)**.")
 
 # ==========================================
 # 1. SIDEBAR: THE CONTROL TOWER
@@ -35,10 +35,28 @@ with st.sidebar:
     exit_target = c_g2.number_input("2029 Target ($)", value=7500000, step=250000, format="%d", help="Your Exit Number.")
 
     st.divider()
+    
+    # --- NEW: ACTUALS SECTION ---
+    with st.expander("📝 Input 2025 Actuals (Baseline)", expanded=False):
+        st.caption("Enter your real FY2025 numbers here to set the baseline.")
+        act_rev_labor = st.number_input("2025 Labor Rev", value=1200000, step=10000, format="%d")
+        act_rev_parts = st.number_input("2025 Job Parts Rev", value=300000, step=10000, format="%d")
+        act_rev_sjob = st.number_input("2025 S-Job Rev", value=800000, step=10000, format="%d")
+        act_rev_spares = st.number_input("2025 Spares Rev", value=100000, step=10000, format="%d")
+        st.markdown("---")
+        act_cogs = st.number_input("2025 Total COGS", value=1400000, step=10000, format="%d")
+        act_opex = st.number_input("2025 Total OpEx", value=800000, step=10000, format="%d")
+        
+        # Calculate derived 2025 stats
+        act_total_rev = act_rev_labor + act_rev_parts + act_rev_sjob + act_rev_spares
+        act_ebitda = act_total_rev - act_cogs - act_opex
+        st.markdown(f"**2025 EBITDA:** ${act_ebitda:,.0f} ({(act_ebitda/act_total_rev)*100:.1f}%)")
+
+    st.divider()
 
     # --- REVENUE INPUTS ---
     st.header("2. Service Revenue (Labor + Job Parts)")
-    tm_service_base = st.number_input("Year 1 Total Service Rev ($)", value=1500000, step=100000, format="%d")
+    tm_service_base = st.number_input("2026 Total Service Rev ($)", value=1500000, step=100000, format="%d")
     tm_growth = st.number_input("Service Growth %", value=20, step=1, min_value=0, max_value=100)
     
     st.subheader("Revenue Split")
@@ -46,7 +64,7 @@ with st.sidebar:
     
     disp_labor = tm_service_base * (labor_split_pct/100)
     disp_parts = tm_service_base * (1 - (labor_split_pct/100))
-    st.markdown(f"<div class='split-box'><b>Year 1 Breakdown:</b><br>🛠️ Labor: <b>${disp_labor:,.0f}</b><br>⚙️ Job Parts: <b>${disp_parts:,.0f}</b></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='split-box'><b>2026 Breakdown:</b><br>🛠️ Labor: <b>${disp_labor:,.0f}</b><br>⚙️ Job Parts: <b>${disp_parts:,.0f}</b></div>", unsafe_allow_html=True)
     
     with st.expander("Service Settings"):
         bill_rate = st.number_input("Bill Rate ($/hr)", value=210, format="%d")
@@ -57,7 +75,7 @@ with st.sidebar:
     st.divider()
 
     st.header("3. S-Jobs (Projects)")
-    s_job_base = st.number_input("Year 1 S-Job Rev ($)", value=1000000, step=100000, format="%d")
+    s_job_base = st.number_input("2026 S-Job Rev ($)", value=1000000, step=100000, format="%d")
     s_job_growth = st.number_input("S-Job Growth %", value=15, step=1, min_value=0, max_value=100)
     
     with st.expander("S-Job Settings"):
@@ -74,7 +92,7 @@ with st.sidebar:
     st.divider()
 
     st.header("4. Spare Parts (Direct)")
-    spares_base = st.number_input("Year 1 Spare Parts Rev ($)", value=150000, step=10000, format="%d")
+    spares_base = st.number_input("2026 Spare Parts Rev ($)", value=150000, step=10000, format="%d")
     spares_growth = st.number_input("Spare Parts Growth %", value=10, step=1, min_value=0, max_value=100)
     spares_margin = st.number_input("Spare Parts Margin %", value=35, step=1, min_value=0, max_value=100)
 
@@ -120,7 +138,7 @@ with st.sidebar:
         
         st.markdown(f"""
         <div class='resource-box'>
-        <b>Year 1 Check:</b><br>
+        <b>2026 Check:</b><br>
         Inputs Total: <b>${total_2026_input:,.0f}</b><br>
         Target: <b>${target_2026:,.0f}</b><br>
         Gap: <b style='color:{"green" if total_2026_input >= target_2026 else "red"}'>${total_2026_input - target_2026:,.0f}</b>
@@ -139,8 +157,41 @@ with st.sidebar:
 # ==========================================
 
 def run_fusion_model():
+    # --- STEP 1: CREATE 2025 ACTUALS ROW ---
+    # We construct the 2025 row manually from the "Actuals" inputs
+    row_2025 = {
+        "Year": 2025,
+        "Total Revenue": act_total_rev,
+        "Rev: Labor": act_rev_labor,
+        "Rev: Job Parts": act_rev_parts,
+        "Rev: S-Jobs": act_rev_sjob,
+        "Rev: Spare Parts": act_rev_spares,
+        "Total COGS": act_cogs,
+        "Total OpEx": act_opex,
+        "Gross Profit": act_total_rev - act_cogs,
+        "Gross Margin %": (act_total_rev - act_cogs)/act_total_rev if act_total_rev else 0,
+        "EBITDA": act_ebitda,
+        "EBITDA Margin %": act_ebitda/act_total_rev if act_total_rev else 0,
+        # Fill other columns with Base/NA for 2025
+        "Techs": base_techs,
+        "Locations": 1, 
+        "Sales Reps": 0,
+        "Total Hires": 0,
+        "OpEx: Hiring": 0,
+        "OpEx: Rent": 0, 
+        "OpEx: Central": 0,
+        "Eng FTE": base_me + base_ce + base_prog, # Approx
+        "Net Income": act_ebitda * (1 - (tax_rate/100)), # Rough est
+        "Net Margin %": (act_ebitda * (1 - (tax_rate/100))) / act_total_rev if act_total_rev else 0,
+        "D&A": 0, "Interest": 0, "Taxes": 0
+    }
+
+    # --- STEP 2: RUN PROJECTIONS 2026-2029 ---
     years = [2026, 2027, 2028, 2029]
     data = []
+    
+    # Add 2025 first
+    data.append(row_2025)
     
     # Growth Trackers
     curr_service_target = tm_service_base
@@ -156,7 +207,10 @@ def run_fusion_model():
     prev_total_hc = base_techs + base_me + base_ce + base_prog
     
     for i, year in enumerate(years):
-        inf = (1 + inflation) ** i
+        inf = (1 + inflation) ** (i + 1) # Inflation starts compounding in 2027 relative to 2026 base? Let's say Year 1 has 0 inflation, Year 2 has 1 yr inflation.
+        # Actually, let's treat inputs as 2026 Real Dollars.
+        if i == 0: inf = 1.0 
+        else: inf = (1 + inflation) ** i
         
         # 1. INFLATED COSTS
         c_tech_inf = cost_tech * inf
@@ -276,7 +330,7 @@ def run_fusion_model():
             "EBITDA Margin %": ebitda/total_rev,
             "Net Income": net_income,
             "Net Margin %": net_income/total_rev,
-            # DETAILS (RESTORED KEYS)
+            # DETAILS
             "Techs": cum_techs,
             "MEs": cum_me,
             "CEs": cum_ce,
@@ -304,8 +358,8 @@ df = run_fusion_model()
 # 3. TOP ROW: SCORECARDS (Side-by-Side)
 # ==========================================
 
-yr1 = df.iloc[0]
-yr4 = df.iloc[-1]
+yr1 = df.iloc[1] # 2026 (Index 1)
+yr4 = df.iloc[-1] # 2029 (Last)
 
 c1, c2, c3 = st.columns(3)
 
@@ -412,9 +466,8 @@ def format_df(d, m): return d.style.format(m)
 
 with tab1:
     st.markdown("### P&L Statement (The Waterfall)")
-    st.info("Here is the progression from Revenue -> EBITDA -> Net Income.")
+    st.info("Includes 2025 Actuals (Baseline) -> 2029 Projections.")
     
-    # Selecting columns in logical P&L order
     cols_pl = ['Year', 
                'Total Revenue', 
                'Total COGS', 
@@ -429,7 +482,6 @@ with tab1:
         'EBITDA Margin %': '{:.1%}', 
         'Net Margin %': '{:.1%}'
     }
-    # Currency format for the rest
     for c in cols_pl:
         if c not in fmt: fmt[c] = "${:,.0f}"
         
@@ -452,3 +504,4 @@ with tab3:
     <b>Central Rule:</b> Starts in {central_start_year} AND requires > 1 Location.
     </div>
     """, unsafe_allow_html=True)
+    
