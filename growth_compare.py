@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import math
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 
@@ -13,140 +12,151 @@ st.markdown("""
     .org-box {background-color: #e3f2fd; padding: 15px; border-radius: 10px; border-left: 5px solid #2196f3;}
     .ma-box {background-color: #e8f5e9; padding: 15px; border-radius: 10px; border-left: 5px solid #4caf50;}
     .risk-metric {font-size: 24px; font-weight: bold;}
-    .delta-pos {color: green; font-weight: bold;}
-    .delta-neg {color: red; font-weight: bold;}
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚖️ The Growth Dilemma: Organic vs. M&A")
-st.markdown("Compare the financial and operational reality of **Scaling Organically** (hiring fast) versus **Scaling via Acquisition** (buying capacity).")
+st.title("⚖️ The 3-Year Horizon: Organic vs. M&A")
+st.markdown("Comparing the **Linear Grind** of organic hiring vs. the **Step-Function** of acquisition over a 36-month period.")
 
 # ==========================================
 # 1. SIDEBAR INPUTS
 # ==========================================
 
 with st.sidebar:
-    st.header("1. Shared Assumptions")
-    base_rev_2025 = st.number_input("2025 Baseline Rev ($)", value=1500000, step=100000, format="%d")
-    target_rev_2026 = st.number_input("2026 Revenue Goal ($)", value=2500000, step=100000, format="%d")
+    st.header("1. Baseline")
+    base_rev_2025 = st.number_input("2025 Start Revenue ($)", value=1500000, step=100000, format="%d")
     
     st.divider()
     
     st.header("2. Scenario A: Organic Grind")
-    st.info("Hiring new techs to hit the number.")
-    hires_needed = st.slider("New Techs needed", 1, 5, 3)
-    ramp_months = st.slider("Tech Ramp Up (Months)", 0, 12, 6, help="Months before a new hire is fully billable.")
-    training_efficiency = st.slider("Training Efficiency %", 0, 100, 40, help="Productivity during ramp period.")
+    st.info("Linear hiring. Hard to scale fast.")
+    hires_per_year = st.slider("New Techs Hired / Year", 1, 6, 3)
+    ramp_months = st.slider("Ramp Up Time (Months)", 0, 12, 6)
     
-    st.markdown("---")
-    st.markdown("**The 'Ops Constraint'**")
-    st.caption("Without a dedicated engineer (which we can't afford yet), S-Job revenue is capped because Ops pulls resources back.")
-    organic_sjob_cap = st.number_input("Max Organic S-Job Rev ($)", value=500000, step=50000, help="The ceiling on projects without a dedicated lead.")
+    # THE OPS CONSTRAINT
+    organic_sjob_cap = st.number_input("Max Organic S-Job ($/yr)", value=500000, step=50000, help="We hit a ceiling without our own Engineer.")
 
     st.divider()
 
     st.header("3. Scenario B: M&A Scale")
-    st.info("Buying a small integrator.")
-    acq_month = st.slider("Acquisition Month (2026)", 1, 12, 3)
-    acq_annual_rev = st.number_input("Target Annual Revenue ($)", value=1200000, step=100000)
-    acq_cost = st.number_input("Acquisition Integration Cost ($)", value=50000, help="One-time legal/integration hit.")
+    st.info("Buying capacity & fixing it.")
+    acq_month = st.slider("Acquisition Month", 1, 12, 3)
+    acq_annual_rev = st.number_input("Acquired Revenue ($)", value=1200000, step=100000)
+    acq_cost = st.number_input("One-Time Integration Cost", value=75000)
     
-    st.markdown("---")
-    st.markdown("**The 'Scale Unlock'**")
-    st.caption("Combined volume justifies a Central Engineer, uncapping S-Job growth.")
-    ma_sjob_cap = st.number_input("New S-Job Potential ($)", value=1500000, step=100000)
+    # THE SCALE UNLOCK
+    ma_sjob_cap = st.number_input("S-Job Unlock ($/yr)", value=1500000, step=100000, help="With volume, we hire a dedicated Engineer and uncap growth.")
+    
+    # SYNERGY
+    st.markdown("**The Turnaround**")
+    initial_margin = st.slider("Acquired Margin (Day 1)", 5, 30, 15, help="They run inefficiently when we buy them.")
+    target_margin = st.slider("Target Margin (Year 2)", 20, 50, 35, help="We apply our Ops/Pricing to fix them.")
 
 # ==========================================
 # 2. CALCULATION ENGINE
 # ==========================================
 
 def run_comparison():
-    # Setup Monthly Timeline for 2026
-    months = list(range(1, 13))
+    months = list(range(1, 37)) # 3 Years
     
     # -- SCENARIO A: ORGANIC --
     org_data = []
-    org_cum_rev = 0
-    org_cum_cost = 0
     
-    # Base Monthly Run Rate (from 2025)
+    # Base Monthly Run Rate
     base_monthly = base_rev_2025 / 12
+    tech_rev_mo = 35000 # Fully ramped tech revenue
+    tech_cost_mo = 6000 # Fully burdened cost
     
-    # Costs
-    tech_salary_mo = 7000 / 1.3 # ~$65k salary + burden
+    cumulative_hires = 0
     
     for m in months:
-        # Base Revenue
-        rev = base_monthly
-        
-        # New Hires Revenue
-        # They start Month 1. Are they ramped?
-        if m <= ramp_months:
-            # Training Mode
-            hire_rev = (hires_needed * 35000) * (training_efficiency/100) # Full cap is ~$35k/mo
-        else:
-            # Ramped Mode
-            hire_rev = (hires_needed * 35000) * 0.9 # 90% utilization
+        # Hiring Logic: We hire evenly throughout the year? 
+        # Let's say we hire 'hires_per_year' every Jan (Month 1, 13, 25) for simplicity
+        year_idx = (m-1) // 12
+        if (m-1) % 12 == 0: 
+            cumulative_hires += hires_per_year
             
-        rev += hire_rev
+        # Revenue Calculation
+        # Base
+        rev = base_monthly * (1.05 ** year_idx) # Base grows 5% naturally
         
-        # S-Job Constraint Check
-        # Assume 20% of revenue is S-Job. Is it capped?
+        # New Hires Revenue (Simple Ramp Logic)
+        # Assume average ramp for the cohort
+        ramp_factor = 1.0
+        # If we just hired them this year, apply ramp penalty
+        if (m - (year_idx*12)) <= ramp_months:
+            ramp_factor = 0.4 # 40% efficiency during ramp
+            
+        rev_from_hires = (cumulative_hires * tech_rev_mo) * ramp_factor
+        rev += rev_from_hires
+        
+        # S-Job Constraint (The Ceiling)
+        # Assume 20% of total revenue is S-Job demand
         implied_sjob = rev * 0.20
         monthly_cap = organic_sjob_cap / 12
         if implied_sjob > monthly_cap:
-            rev -= (implied_sjob - monthly_cap) # Clip the revenue
+            rev -= (implied_sjob - monthly_cap) # We lose that revenue
             
-        # Costs
-        # We pay full salary from Day 1
-        cost_labor = (hires_needed * tech_salary_mo) + (base_monthly * 0.6) # Base costs
+        # Costs (Full cost immediately)
+        cost_base = rev * 0.60 # Standard 40% margin on base
+        cost_hires = cumulative_hires * tech_cost_mo
         
-        ebitda = rev - cost_labor
+        ebitda = rev - cost_base - cost_hires
         
-        org_data.append({
-            "Month": m,
-            "Revenue": rev,
-            "EBITDA": ebitda,
-            "Scenario": "Organic"
-        })
+        org_data.append({"Month": m, "Revenue": rev, "EBITDA": ebitda, "Scenario": "Organic"})
         
     # -- SCENARIO B: M&A --
     ma_data = []
     
     for m in months:
-        # Base Revenue
-        rev = base_monthly
+        year_idx = (m-1) // 12
+        
+        # Base Revenue (Same natural growth)
+        rev = base_monthly * (1.05 ** year_idx)
         
         # Acquisition Impact
+        acq_rev_monthly = 0
         if m >= acq_month:
-            acq_rev = acq_annual_rev / 12
-            rev += acq_rev
+            acq_rev_monthly = acq_annual_rev / 12
+            # We grow the acquired co by 10% yr after fixing sales
+            if m > 12: acq_rev_monthly *= 1.10
+            if m > 24: acq_rev_monthly *= 1.10
             
-            # S-Job Unlock
-            # We assume we capture more S-Job work because we have capacity
-            # Bonus 10% growth on top due to synergy
-            rev = rev * 1.05 
+            rev += acq_rev_monthly
             
-        # Costs
-        # Base Cost
-        cost = base_monthly * 0.6
+        # S-Job Unlock (The Slider Logic Fixed!)
+        # With M&A, our Cap is higher (ma_sjob_cap)
+        implied_sjob = rev * 0.20
+        monthly_cap_ma = ma_sjob_cap / 12
         
-        # Acq Cost (Assume acquired company runs at break-even initially due to cleanup)
+        # We assume we capture everything up to the higher cap
+        if implied_sjob > monthly_cap_ma:
+            rev -= (implied_sjob - monthly_cap_ma)
+            
+        # Costs & Synergy
+        # Base business runs at standard 40% margin
+        cost_base = (base_monthly * (1.05 ** year_idx)) * 0.60
+        
+        # Acquired Business Cost (The Turnaround)
+        cost_acq = 0
         if m >= acq_month:
-            cost += (acq_annual_rev / 12) * 0.85 # 15% EBITDA margin acquired
+            # Calculate current margin based on time since acq
+            months_owned = m - acq_month
+            if months_owned < 12:
+                # Year 1: Low Margin (15%) -> Cost is 85%
+                margin = initial_margin / 100
+            else:
+                # Year 2+: Target Margin (35%) -> Cost is 65%
+                margin = target_margin / 100
             
-        # Integration Hit
-        if m == acq_month:
-            cost += acq_cost
+            cost_acq = acq_rev_monthly * (1 - margin)
             
-        ebitda = rev - cost
+        # One-time Integration Hit
+        integration = acq_cost if m == acq_month else 0
         
-        ma_data.append({
-            "Month": m,
-            "Revenue": rev,
-            "EBITDA": ebitda,
-            "Scenario": "M&A"
-        })
+        ebitda = rev - cost_base - cost_acq - integration
+        
+        ma_data.append({"Month": m, "Revenue": rev, "EBITDA": ebitda, "Scenario": "M&A"})
         
     return pd.DataFrame(org_data), pd.DataFrame(ma_data)
 
@@ -167,34 +177,23 @@ c1, c2 = st.columns(2)
 with c1:
     st.markdown(f"""
     <div class='org-box'>
-    <h3>🚜 Scenario A: Organic Grind</h3>
-    <p>Hire {hires_needed} Techs immediately. Fight for Ops resources.</p>
-    <hr>
+    <h3>🚜 Scenario A: Organic (3 Years)</h3>
     <span class='risk-metric'>${total_org_rev:,.0f}</span> Revenue<br>
     <span class='risk-metric'>${total_org_ebitda:,.0f}</span> EBITDA<br>
     <br>
-    <b>🚨 The Risks:</b>
-    <ul>
-    <li><b>Training Drag:</b> {ramp_months} months of low margin.</li>
-    <li><b>Ops Ceiling:</b> S-Jobs capped at ${organic_sjob_cap:,.0f}.</li>
-    </ul>
+    <b>The Reality:</b> Linear growth creates a "Ceiling."<br>
+    Even with {hires_per_year} hires/year, we can't capture the S-Job volume.
     </div>
     """, unsafe_allow_html=True)
 
 with c2:
     st.markdown(f"""
     <div class='ma-box'>
-    <h3>🚀 Scenario B: M&A Scale</h3>
-    <p>Acquire Month {acq_month}. Instant Capacity. Dedicated Engineer.</p>
-    <hr>
+    <h3>🚀 Scenario B: M&A (3 Years)</h3>
     <span class='risk-metric'>${total_ma_rev:,.0f}</span> Revenue<br>
     <span class='risk-metric'>${total_ma_ebitda:,.0f}</span> EBITDA<br>
     <br>
-    <b>✅ The Arbitrage:</b>
-    <ul>
-    <li><b>Instant Revenue:</b> Day 1 billing from acquired book.</li>
-    <li><b>Unlocked S-Jobs:</b> Volume justifies Central Engineer.</li>
-    </ul>
+    <b>The Reality:</b> Buying revenue is ugly in Year 1, but creates massive separation in Year 2 & 3 due to margin cleanup.
     </div>
     """, unsafe_allow_html=True)
 
@@ -204,39 +203,37 @@ st.divider()
 c_chart1, c_chart2 = st.columns(2)
 
 with c_chart1:
-    st.subheader("Monthly Revenue Trajectory")
+    st.subheader("Revenue Separation (Cumulative)")
     fig1, ax1 = plt.subplots(figsize=(6, 4))
-    ax1.plot(df_org['Month'], df_org['Revenue'], label='Organic', color='#2196f3', linewidth=3, marker='o')
-    ax1.plot(df_ma['Month'], df_ma['Revenue'], label='M&A', color='#4caf50', linewidth=3, marker='o')
-    ax1.set_xlabel('Month (2026)')
-    ax1.set_ylabel('Revenue ($)')
+    ax1.plot(df_org['Month'], df_org['Revenue'].cumsum(), label='Organic', color='#2196f3', linewidth=2)
+    ax1.plot(df_ma['Month'], df_ma['Revenue'].cumsum(), label='M&A', color='#4caf50', linewidth=3)
+    
+    # Fill area to show gap
+    ax1.fill_between(df_ma['Month'], df_org['Revenue'].cumsum(), df_ma['Revenue'].cumsum(), color='#4caf50', alpha=0.1)
+    
+    ax1.set_xlabel('Months (3 Years)')
+    ax1.set_ylabel('Cum. Revenue ($)')
     ax1.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
     ax1.legend()
-    ax1.grid(True, alpha=0.3)
     st.pyplot(fig1)
 
 with c_chart2:
-    st.subheader("Cumulative EBITDA (The Cash Reality)")
+    st.subheader("EBITDA Comparison (Quarterly)")
+    # Group by Quarter for cleaner chart
+    df_org['Qtr'] = ((df_org['Month']-1)//3) + 1
+    df_ma['Qtr'] = ((df_ma['Month']-1)//3) + 1
+    
+    q_org = df_org.groupby('Qtr')['EBITDA'].sum()
+    q_ma = df_ma.groupby('Qtr')['EBITDA'].sum()
+    
     fig2, ax2 = plt.subplots(figsize=(6, 4))
-    # Cumulative Sum
-    ax2.plot(df_org['Month'], df_org['EBITDA'].cumsum(), label='Organic', color='#2196f3', linewidth=3)
-    ax2.plot(df_ma['Month'], df_ma['EBITDA'].cumsum(), label='M&A', color='#4caf50', linewidth=3)
-    ax2.set_xlabel('Month (2026)')
-    ax2.set_ylabel('Cumulative EBITDA ($)')
+    ax2.bar(q_org.index, q_org, label='Organic', color='#2196f3', alpha=0.6)
+    ax2.plot(q_ma.index, q_ma, label='M&A', color='#4caf50', linewidth=3, marker='o')
+    
+    ax2.set_xlabel('Quarters (1-12)')
+    ax2.set_ylabel('EBITDA ($)')
     ax2.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
     ax2.legend()
-    ax2.grid(True, alpha=0.3)
     st.pyplot(fig2)
 
-st.divider()
-
-st.subheader("The Verdict")
-diff_rev = total_ma_rev - total_org_rev
-diff_ebit = total_ma_ebitda - total_org_ebitda
-
-st.markdown(f"""
-By pursuing **M&A** instead of Organic growth in Year 1:
-* You generate **${diff_rev:,.0f}** more Top Line Revenue.
-* You preserve **${diff_ebit:,.0f}** in EBITDA (avoiding the "Training J-Curve").
-* **Most Importantly:** You unlock the volume required to hire the Central Engineer, solving the "Ops Constraint" permanently.
-""")
+st.info("💡 **Notice the EBITDA Dip:** In M&A (Green Line), EBITDA dips in Q1/Q2 due to integration costs, but overtakes Organic by Year 2 once margins are fixed.")
