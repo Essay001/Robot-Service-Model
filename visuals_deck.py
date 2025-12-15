@@ -7,7 +7,17 @@ import matplotlib.ticker as mtick
 st.set_page_config(page_title="Executive Visuals Deck", layout="wide")
 
 st.title("📸 Presentation Visuals Generator")
-st.markdown("Use these charts for your FY26 Growth Strategy Deck.")
+st.markdown("Use the **sidebar sliders** to adjust the chart size for your PowerPoint slides.")
+
+# ==========================================
+# SIDEBAR CONTROLS
+# ==========================================
+with st.sidebar:
+    st.header("🖼️ Chart Dimensions")
+    st.info("Adjust these to fit your slide.")
+    # Default set to (6, 4) which is standard for PPT
+    c_width = st.slider("Chart Width (Inches)", 4, 15, 6) 
+    c_height = st.slider("Chart Height (Inches)", 3, 10, 4)
 
 # ==========================================
 # CHART 1: REVENUE BRIDGE (WATERFALL)
@@ -28,8 +38,8 @@ df_wf['cumsum'] = df_wf['Value'].cumsum()
 df_wf.loc[df_wf.index[-1], 'Value'] = df_wf.loc[df_wf.index[-2], 'cumsum'] # Set Total
 df_wf.loc[df_wf.index[-1], 'cumsum'] = df_wf.loc[df_wf.index[-1], 'Value']
 
-# Plotting
-fig1, ax1 = plt.subplots(figsize=(10, 5))
+# Plotting - Uses Sidebar Dimensions
+fig1, ax1 = plt.subplots(figsize=(c_width, c_height))
 bottom = 0
 colors = []
 
@@ -45,11 +55,10 @@ for i, row in df_wf.iterrows():
 ax1.set_ylabel('Revenue ($ Millions)')
 ax1.set_title('FY26 Revenue Bridge: Building the Target')
 ax1.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:.1f}M'))
-plt.xticks(rotation=15)
+plt.xticks(rotation=45, ha='right') # Angled text for better fit
 ax1.grid(axis='y', linestyle='--', alpha=0.5)
 
 st.pyplot(fig1)
-st.info("💡 **Narrative:** 'We aren't guessing. We are stacking specific, high-probability growth levers on top of our stable base.'")
 
 st.divider()
 
@@ -77,7 +86,7 @@ reb_rev = [37500] * 12 # Flat, immediate
 reb_cash = np.array(reb_rev) - np.array(reb_cost)
 reb_cum = np.cumsum(reb_cash)
 
-fig2, ax2 = plt.subplots(figsize=(10, 5))
+fig2, ax2 = plt.subplots(figsize=(c_width, c_height))
 
 # Plot Lines
 ax2.plot(months, green_cum, label='Green Tech (Junior)', color='#f44336', linewidth=3, linestyle='--')
@@ -86,12 +95,9 @@ ax2.plot(months, reb_cum, label='Rebadge Tech (Expert)', color='#4caf50', linewi
 # Zero Line
 ax2.axhline(0, color='black', linewidth=1)
 
-# Annotations
-ax2.annotate('The Training Trap\n(Negative Cash)', xy=(4, -15000), xytext=(4, -60000),
-             arrowprops=dict(facecolor='red', shrink=0.05), color='red', ha='center')
-
-ax2.annotate('Immediate ROI', xy=(2, 40000), xytext=(2, 100000),
-             arrowprops=dict(facecolor='green', shrink=0.05), color='green', ha='center')
+# Annotations (Adjusted position for smaller chart)
+ax2.annotate('Training Trap\n(Negative Cash)', xy=(4, -15000), xytext=(4, -90000),
+             arrowprops=dict(facecolor='red', shrink=0.05), color='red', ha='center', fontsize=9)
 
 ax2.set_ylabel('Cumulative Cash Generated ($)')
 ax2.set_xlabel('Months in FY26')
@@ -101,7 +107,6 @@ ax2.legend()
 ax2.grid(True, alpha=0.3)
 
 st.pyplot(fig2)
-st.info("💡 **Narrative:** 'The Red Line is the standard hiring model. We are paying the higher salary to jump straight to the Green Line.'")
 
 st.divider()
 
@@ -111,7 +116,7 @@ st.divider()
 st.header("Slide 3: The Margin Step-Up")
 st.caption("Visualizing the instant impact of CSP Status on Parts Profitability.")
 
-fig3, ax3 = plt.subplots(figsize=(8, 4))
+fig3, ax3 = plt.subplots(figsize=(c_width, c_height))
 margin_months = list(range(1, 13))
 margin_vals = [10 if m < 6 else 25 for m in margin_months] # Step at month 6
 
@@ -126,8 +131,8 @@ ax3.set_title('Impact of Fanuc CSP Certification')
 ax3.yaxis.set_major_formatter(mtick.PercentFormatter(100))
 
 # Annotation
-ax3.annotate('CSP Activation\n(Profit +150%)', xy=(6, 25), xytext=(2, 30),
-             arrowprops=dict(facecolor='black', shrink=0.05), fontsize=12, fontweight='bold')
+ax3.annotate('CSP Activation\n(Profit +150%)', xy=(6, 25), xytext=(3, 30),
+             arrowprops=dict(facecolor='black', shrink=0.05), fontsize=10, fontweight='bold')
 
 st.pyplot(fig3)
 
@@ -146,7 +151,7 @@ parts = [30000, 35000, 55000, 60000] # CSP kicks in Q3
 labor = [110000, 115000, 220000, 230000] # Hire 1 in Q1, Hire 2 in Q3
 sjobs = [40000, 50000, 70000, 90000] # Growing S-Jobs
 
-fig4, ax4 = plt.subplots(figsize=(10, 5))
+fig4, ax4 = plt.subplots(figsize=(c_width, c_height))
 
 ax4.stackplot(quarters, base, parts, labor, sjobs, 
               labels=['Base Break/Fix', 'Spare Parts (CSP)', 'Rebadge Labor', 'S-Projects'],
@@ -155,8 +160,7 @@ ax4.stackplot(quarters, base, parts, labor, sjobs,
 ax4.set_ylabel('Quarterly Revenue ($)')
 ax4.set_title('FY26 Revenue Composition & Growth')
 ax4.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
-ax4.legend(loc='upper left')
+ax4.legend(loc='upper left', fontsize='small')
 ax4.grid(axis='y', linestyle='--', alpha=0.3)
 
 st.pyplot(fig4)
-st.info("💡 **Narrative:** 'Notice the Orange (Labor) and Purple (Parts) layers expanding in Q3/Q4. We exit the year at a much higher run-rate than we started.'")
