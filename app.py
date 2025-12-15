@@ -42,8 +42,8 @@ with st.sidebar:
         st.caption("Enter your real FY2025 numbers here to set the baseline.")
         act_rev_labor = st.number_input("2025 Labor Rev", value=1200000, step=10000, format="%d")
         act_rev_parts = st.number_input("2025 Job Parts Rev", value=300000, step=10000, format="%d")
-        act_rev_sjob = st.number_input("2025 S-Job Rev", value=800000, step=10000, format="%d")
-        act_rev_spares = st.number_input("2025 Spare Parts Rev", value=100000, step=10000, format="%d")
+        act_rev_sjob = st.number_input("2025 S-Job Rev", value=750000, step=10000, format="%d")
+        act_rev_spares = st.number_input("2025 Spare Parts Rev", value=110000, step=10000, format="%d")
         st.markdown("---")
         act_cogs = st.number_input("2025 Total COGS", value=1400000, step=10000, format="%d")
         act_opex = st.number_input("2025 Total OpEx", value=800000, step=10000, format="%d")
@@ -503,3 +503,4 @@ with tab3:
     <b>Central Rule:</b> Starts in {central_start_year} AND requires > 1 Location.
     </div>
     """, unsafe_allow_html=True)
+
