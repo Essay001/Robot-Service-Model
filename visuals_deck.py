@@ -14,84 +14,85 @@ st.markdown("Use the **sidebar sliders** to adjust the chart size for your Power
 # ==========================================
 with st.sidebar:
     st.header("🖼️ Chart Dimensions")
-    st.info("Adjust these to fit your slide.")
     c_width = st.slider("Chart Width (Inches)", 4, 15, 6) 
     c_height = st.slider("Chart Height (Inches)", 3, 10, 4)
 
 # ==========================================
-# CHART 1: REVENUE BRIDGE (WATERFALL) - STRICT MATH
+# CHART 1: REVENUE BRIDGE (WATERFALL)
 # ==========================================
 st.header("Slide 1: The 'Revenue Bridge' (Waterfall)")
 st.caption("Explaining how we get from FY25 to the FY26 Target (Strict Math).")
 
-# Data for Waterfall
-# Baseline: $1.35M
-# Rebadge Labor: $672k (2 Techs * $336k)
-# Organic Parts: $30k (Growth from $120k to $150k)
-# Tech Parts: $50k (7.5% Attach Rate on Labor)
-# S-Job Growth: $200k (Growth from $400k base to $600k target)
-
 wf_data = {
     'Category': ['FY25 Baseline', '+ Rebadge Labor', '+ Organic Parts', '+ Tech Parts (Attached)', '+ S-Job Growth', 'FY26 Target'],
-    'Value': [1.35, 0.672, 0.030, 0.050, 0.200, 0.0], # Values in Millions
+    'Value': [1.5, 0.672, 0.030, 0.100, 0.200, 0.0], 
     'Type': ['Base', 'Add', 'Add', 'Add', 'Add', 'Total']
 }
 df_wf = pd.DataFrame(wf_data)
-
-# Calculate Start/End points for bars
 df_wf['cumsum'] = df_wf['Value'].cumsum()
-df_wf.loc[df_wf.index[-1], 'Value'] = df_wf.loc[df_wf.index[-2], 'cumsum'] # Set Total
+df_wf.loc[df_wf.index[-1], 'Value'] = df_wf.loc[df_wf.index[-2], 'cumsum']
 df_wf.loc[df_wf.index[-1], 'cumsum'] = df_wf.loc[df_wf.index[-1], 'Value']
 
-# Plotting - Uses Sidebar Dimensions
 fig1, ax1 = plt.subplots(figsize=(c_width, c_height))
 bottom = 0
-
 for i, row in df_wf.iterrows():
-    if row['Type'] == 'Base' or row['Type'] == 'Total':
-        ax1.bar(row['Category'], row['Value'], color='#2196f3', edgecolor='black')
-        bottom = row['Value']
-    else:
-        ax1.bar(row['Category'], row['Value'], bottom=bottom, color='#4caf50', edgecolor='black')
-        bottom += row['Value']
+    color = '#2196f3' if row['Type'] in ['Base', 'Total'] else '#4caf50'
+    ax1.bar(row['Category'], row['Value'], bottom=bottom if row['Type'] != 'Base' and row['Type'] != 'Total' else 0, color=color, edgecolor='black')
+    if row['Type'] != 'Base' and row['Type'] != 'Total': bottom += row['Value']
 
-# Labels and Formatting
 ax1.set_ylabel('Revenue ($ Millions)')
 ax1.set_title('FY26 Revenue Bridge: Building the Target')
-ax1.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:.1f}M'))
-plt.xticks(rotation=45, ha='right') # Angled text for better fit
+ax1.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:.2f}M'))
+plt.xticks(rotation=45, ha='right') 
 ax1.grid(axis='y', linestyle='--', alpha=0.5)
-
 st.pyplot(fig1)
 
 st.divider()
 
 # ==========================================
-# CHART 2: THE CASH FLOW J-CURVE
+# CHART 2: THE CASH FLOW J-CURVE (UPDATED)
 # ==========================================
 st.header("Slide 2: The 'Training Trap' (J-Curve)")
-st.caption("Cumulative Cash Flow: Rebadge (Expert) vs. Green (Trainee) over Year 1.")
+st.caption("Cumulative Cash Flow: Updated with 12-Month Ramp & Full Burden.")
 
 months = list(range(1, 13))
-green_cost = [7500] * 12
+
+# --- GREEN TECH ASSUMPTIONS ---
+# Base: $75k
+# Burden: (75000 * 0.11) + 23000 = $31,250
+# Total Cost: $106,250/yr -> $8,854/mo
+green_monthly_cost = 8854
+# Revenue: Ramps to $28,000/mo ($336k/yr) over 12 months
 green_rev = []
 for m in months:
-    ramp = min(m/9, 1.0)
+    ramp = m / 12 # Linear ramp over 12 months
     green_rev.append(28000 * ramp)
-green_cash = np.array(green_rev) - np.array(green_cost)
+    
+green_cash = np.array(green_rev) - green_monthly_cost
 green_cum = np.cumsum(green_cash)
 
-reb_cost = [14000] * 12
+# --- REBADGE TECH ASSUMPTIONS ---
+# Base: $130k
+# Burden: (130000 * 0.11) + 23000 = $37,300
+# Total Cost: $167,300/yr -> $13,942/mo
+reb_monthly_cost = 13942
+# Revenue: $28,000 labor + approx $9,500 value add (parts/efficiency) = $37,500/mo
 reb_rev = [37500] * 12 
-reb_cash = np.array(reb_rev) - np.array(reb_cost)
+reb_cash = np.array(reb_rev) - reb_monthly_cost
 reb_cum = np.cumsum(reb_cash)
 
+# --- PLOTTING ---
 fig2, ax2 = plt.subplots(figsize=(c_width, c_height))
-ax2.plot(months, green_cum, label='Green Tech (Junior)', color='#f44336', linewidth=3, linestyle='--')
-ax2.plot(months, reb_cum, label='Rebadge Tech (Expert)', color='#4caf50', linewidth=4)
+
+ax2.plot(months, green_cum, label='Green Tech ($75k Base + 12 Mo Ramp)', color='#f44336', linewidth=3, linestyle='--')
+ax2.plot(months, reb_cum, label='Rebadge Tech ($130k Base + Instant)', color='#4caf50', linewidth=4)
 ax2.axhline(0, color='black', linewidth=1)
-ax2.annotate('Training Trap\n(Negative Cash)', xy=(4, -15000), xytext=(4, -90000),
-             arrowprops=dict(facecolor='red', shrink=0.05), color='red', ha='center', fontsize=9)
+
+# Dynamic Annotation for Green Tech Hole
+min_val = min(green_cum)
+min_idx = list(green_cum).index(min_val)
+ax2.annotate('Deep Cash Hole', xy=(min_idx+1, min_val), xytext=(min_idx+1, min_val - 40000),
+             arrowprops=dict(facecolor='red', shrink=0.05), color='red', ha='center', fontsize=9, fontweight='bold')
 
 ax2.set_ylabel('Cumulative Cash Generated ($)')
 ax2.set_xlabel('Months in FY26')
