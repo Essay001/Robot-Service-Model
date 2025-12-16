@@ -1,156 +1,507 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import math
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 
-st.set_page_config(page_title="Strategic Exit Model (Updated)", layout="wide")
+# --- PAGE CONFIGURATION ---
+st.set_page_config(page_title="2029 Strategic Exit Model", layout="wide")
 
-st.title(" 🚀 Strategic Exit Model: The 5-Year P&L")
-st.markdown("Forecasting the path to a **$7.5M Exit** using precise burden logic.")
+st.markdown("""
+<style>
+   .goal-box {background-color: #e8f5e9; padding: 15px; border-radius: 10px; border-left: 10px solid #2e7d32; text-align: center; height: 100%;}
+   .miss-box {background-color: #ffebee; padding: 15px; border-radius: 10px; border-left: 10px solid #c62828; text-align: center; height: 100%;}
+   .info-box {background-color: #e3f2fd; padding: 15px; border-radius: 10px; border-left: 10px solid #1565c0; text-align: center; height: 100%;}
+   .metric-label {font-size: 14px; color: #555;}
+   .metric-value {font-size: 24px; font-weight: bold;}
+   .audit-box {background-color: #fff8e1; padding: 15px; border-radius: 5px; border-left: 5px solid #ffc107; font-size: 14px; margin-top: 10px;}
+   .resource-box {background-color: #e3f2fd; padding: 10px; border-radius: 5px; margin-top: 10px; font-size: 12px;}
+   .split-box {background-color: #f3f3f3; padding: 10px; border-radius: 5px; margin-top: 5px; margin-bottom: 15px; font-size: 13px;}
+</style>
+""", unsafe_allow_html=True)
+
+st.title("🚀 2029 Strategic Exit Model")
+st.markdown("The complete business plan: **Matrix Service Organization**, **Internal Chargebacks**, and **Corp Allocations**.")
 
 # ==========================================
-# SIDEBAR - INPUTS
+# 1. SIDEBAR: THE CONTROL TOWER
 # ==========================================
+
 with st.sidebar:
-    st.header("1. Current State (2025)")
-    current_rev = st.number_input("Current Revenue ($)", value=1500000, step=100000)
-    current_ebitda = st.number_input("Current EBITDA ($)", value=225000, step=10000)
-    
-    st.divider()
-    
-    st.header("2. Growth Assumptions")
-    organic_growth = st.slider("Organic Growth %", 5, 30, 15)
-    
-    st.divider()
-    
-    st.header("3. Labor & Burden (New!)")
-    st.info("Cost = Base + 11% Tax + $23k Ins.")
-    
-    # Tech Inputs
-    tech_base_salary = st.number_input("Avg Tech Base Salary ($)", value=90000, step=5000)
-    tech_count_start = st.number_input("Starting Tech Count", value=6)
-    hires_per_year = st.slider("Net New Techs / Year", 1, 5, 2)
-    
-    # Engineer Inputs
-    engineer_base = st.number_input("Central Engineer Base ($)", value=130000)
-    engineer_trigger = st.number_input("S-Job Rev Trigger ($)", value=1200000)
-    
-    st.divider()
-    
-    st.header("4. Acquisition (Optional)")
-    acq_year = st.selectbox("Acquisition Year", ["None", "2026", "2027", "2028"])
-    acq_rev = st.number_input("Target Revenue ($)", value=1500000)
-    acq_margin = st.slider("Target EBITDA Margin %", 5, 30, 15)
-
-# ==========================================
-# BURDEN CALCULATOR FUNCTION
-# ==========================================
-def calculate_burdened_cost(base_salary):
-    # Formula: Base + (Base * 11%) + $23,000 Health/Ins
-    return base_salary + (base_salary * 0.11) + 23000
-
-# ==========================================
-# CALCULATION ENGINE
-# ==========================================
-years = [2025, 2026, 2027, 2028, 2029]
-data = []
-
-# Initialize
-rev = current_rev
-ebitda = current_ebitda
-tech_count = tech_count_start
-engineer_hired = False
-
-for year in years:
-    # 1. Revenue Growth
-    if year > 2025:
-        rev = rev * (1 + (organic_growth/100))
-        
-    # 2. Acquisition Bump
-    acq_impact = 0
-    acq_ebitda_impact = 0
-    if str(year) == acq_year:
-        acq_impact = acq_rev
-        rev += acq_impact
-        # Acquired EBITDA
-        acq_ebitda_impact = acq_rev * (acq_margin/100)
-        
-    # 3. Cost Calculations
-    # Update Headcount
-    if year > 2025:
-        tech_count += hires_per_year
-        
-    # Tech Labor Cost (Burdened)
-    tech_burdened = calculate_burdened_cost(tech_base_salary)
-    total_tech_cost = tech_count * tech_burdened
-    
-    # Central Engineer Logic
-    # Assume S-Jobs are ~25% of total revenue for trigger check
-    s_job_proxy = rev * 0.25
-    eng_cost = 0
-    if s_job_proxy >= engineer_trigger or engineer_hired:
-        engineer_hired = True
-        eng_cost = calculate_burdened_cost(engineer_base)
-    
-    # 4. Gross Margin & Overhead (Simplified Model)
-    # Assume Material/Other COGS is 20% of Revenue
-    cogs_materials = rev * 0.20
-    # Gross Profit
-    gp = rev - cogs_materials - total_tech_cost - eng_cost
-    
-    # SG&A (Overhead) - grows slowly
-    # Base overhead estimate derived from 2025 start
-    if year == 2025:
-        # Back into overhead: Rev - COGS - Labor - EBITDA = Overhead
-        overhead = rev - cogs_materials - total_tech_cost - eng_cost - current_ebitda
-    else:
-        overhead = overhead * 1.05 # 5% inflation
-        
-    # 5. EBITDA
-    # If acquisition happened, we add its EBITDA directly, assuming integration
-    operating_ebitda = gp - overhead
-    if str(year) == acq_year:
-        # In transition year, maybe we pay integration costs?
-        pass 
-        
-    final_ebitda = operating_ebitda # + acq_ebitda_impact is implicit in Revenue growth if we modeled it fully detailed
-    
-    # RE-CALC ADJUSTMENT: For this simple view, let's stick to Margin % logic for the core, 
-    # but specific logic for the new Labor Burden.
-    
-    # Let's force the EBITDA to respect the new Labor costs
-    final_ebitda = rev - cogs_materials - total_tech_cost - eng_cost - overhead
-    
-    data.append({
-        "Year": year,
-        "Revenue": rev,
-        "EBITDA": final_ebitda,
-        "Tech_Count": tech_count,
-        "Eng_Hired": "Yes" if engineer_hired else "No",
-        "Tech_Cost_Total": total_tech_cost
-    })
-
-df = pd.DataFrame(data)
-
-# ==========================================
-# DASHBOARD
-# ==========================================
-c1, c2, c3 = st.columns(3)
-exit_ebitda = df.iloc[-1]['EBITDA']
-exit_val = exit_ebitda * 6.5 # Multiple
-
-with c1:
-    st.metric("2029 Revenue", f"${df.iloc[-1]['Revenue']/1000000:.1f}M")
-with c2:
-    st.metric("2029 EBITDA", f"${exit_ebitda/1000000:.1f}M")
-with c3:
-    st.metric("Est. Exit Value (6.5x)", f"${exit_val/1000000:.1f}M")
+st.header("1. Strategic Goals")
+c_g1, c_g2 = st.columns(2)
+# UPDATED DEFAULT: 2,500,000
+target_2026 = c_g1.number_input("2026 Target ($)", value=2500000, step=250000, format="%d", help="Your goal for Year 1.")
+exit_target = c_g2.number_input("2029 Target ($)", value=7500000, step=250000, format="%d", help="Your Exit Number.")
 
 st.divider()
 
-st.subheader("Financial Forecast")
-st.dataframe(df.style.format({"Revenue": "${:,.0f}", "EBITDA": "${:,.0f}", "Tech_Cost_Total": "${:,.0f}"}))
+# --- ACTUALS SECTION ---
+with st.expander("📝 Input 2025 Actuals (Baseline)", expanded=False):
+st.caption("Enter your real FY2025 numbers here to set the baseline.")
+act_rev_labor = st.number_input("2025 Labor Rev", value=1200000, step=10000, format="%d")
+act_rev_parts = st.number_input("2025 Job Parts Rev", value=300000, step=10000, format="%d")
+        act_rev_sjob = st.number_input("2025 S-Job Rev", value=800000, step=10000, format="%d")
+        act_rev_spares = st.number_input("2025 Spare Parts Rev", value=100000, step=10000, format="%d")
+        act_rev_sjob = st.number_input("2025 S-Job Rev", value=750000, step=10000, format="%d")
+        act_rev_spares = st.number_input("2025 Spare Parts Rev", value=110000, step=10000, format="%d")
+st.markdown("---")
+act_cogs = st.number_input("2025 Total COGS", value=1400000, step=10000, format="%d")
+act_opex = st.number_input("2025 Total OpEx", value=800000, step=10000, format="%d")
 
-st.caption(f"**Burden Logic Used:** Base + 11% Tax + $23k Insurance.")
-st.caption(f"Example Tech: ${tech_base_salary:,.0f} Base -> **${calculate_burdened_cost(tech_base_salary):,.0f} Burdened**")
+# Calculate derived 2025 stats
+act_total_rev = act_rev_labor + act_rev_parts + act_rev_sjob + act_rev_spares
+act_ebitda = act_total_rev - act_cogs - act_opex
+st.markdown(f"**2025 EBITDA:** ${act_ebitda:,.0f} ({(act_ebitda/act_total_rev)*100:.1f}%)")
+
+st.divider()
+
+# --- REVENUE INPUTS ---
+st.header("2. Service Revenue (Labor + Job Parts)")
+tm_service_base = st.number_input("2026 Total Service Rev ($)", value=1500000, step=100000, format="%d")
+tm_growth = st.number_input("Service Growth %", value=20, step=1, min_value=0, max_value=100)
+
+st.subheader("Revenue Split")
+labor_split_pct = st.number_input("Split: % from Labor", value=75, step=1, min_value=0, max_value=100)
+
+disp_labor = tm_service_base * (labor_split_pct/100)
+disp_parts = tm_service_base * (1 - (labor_split_pct/100))
+st.markdown(f"<div class='split-box'><b>2026 Breakdown:</b><br>🛠️ Labor: <b>${disp_labor:,.0f}</b><br>⚙️ Job Parts: <b>${disp_parts:,.0f}</b></div>", unsafe_allow_html=True)
+
+with st.expander("Service Settings"):
+bill_rate = st.number_input("Bill Rate ($/hr)", value=210, format="%d")
+utilization_pct = st.number_input("Tech Utilization %", value=80, step=1, min_value=10, max_value=100)
+utilization = utilization_pct / 100
+job_parts_margin = st.number_input("Job Parts Margin %", value=30, step=1, min_value=0, max_value=100)
+
+st.divider()
+
+st.header("3. S-Jobs (Projects)")
+s_job_base = st.number_input("2026 S-Job Rev ($)", value=1000000, step=100000, format="%d")
+s_job_growth = st.number_input("S-Job Growth %", value=15, step=1, min_value=0, max_value=100)
+
+with st.expander("S-Job Settings"):
+sj_mat_pct = st.number_input("S-Job Mat Cost %", value=50, step=1)
+sj_lab_pct = st.number_input("S-Job Labor Cost %", value=30, step=1)
+
+st.caption("Resource Split (Labor Portion):")
+c1, c2 = st.columns(2)
+w_tech = c1.number_input("Tech %", value=20, format="%d")/100
+w_me = c2.number_input("ME %", value=40, format="%d")/100
+w_ce = c1.number_input("CE %", value=20, format="%d")/100
+w_prog = c2.number_input("Prog %", value=20, format="%d")/100
+
+st.divider()
+
+st.header("4. Spare Parts (Direct)")
+spares_base = st.number_input("2026 Spare Parts Rev ($)", value=150000, step=10000, format="%d")
+spares_growth = st.number_input("Spare Parts Growth %", value=10, step=1, min_value=0, max_value=100)
+spares_margin = st.number_input("Spare Parts Margin %", value=35, step=1, min_value=0, max_value=100)
+
+st.divider()
+
+st.header("5. Costs & Baseline")
+with st.expander("Operational Details", expanded=True):
+st.caption("Baseline Staff (Already Hired):")
+c_h1, c_h2 = st.columns(2)
+base_techs = c_h1.number_input("Base Techs", value=2)
+base_me = c_h2.number_input("Base ME", value=1)
+base_ce = c_h1.number_input("Base CE", value=1)
+base_prog = c_h2.number_input("Base Prog", value=1)
+
+st.caption("Costs:")
+cost_tech = st.number_input("Tech Cost ($/hr)", value=85, format="%d")
+cost_eng = st.number_input("Eng Cost ($/hr)", value=85, format="%d")
+
+techs_per_loc_input = st.number_input("Max Techs per Location", value=4)
+
+# --- TIMING SECTION ---
+st.markdown("---")
+st.markdown("#### ⏳ Timing & Triggers")
+rent_per_loc = st.number_input("Rent ($/mo)", value=5000, format="%d")
+is_hq_free = st.checkbox("Is HQ Rent Free?", value=True, help="If checked, you only pay rent for Location 2, 3, etc.")
+
+central_cost = st.number_input("Corp Allocation (IT/HR) $/mo", value=8000, format="%d")
+central_start_year = st.selectbox("Start Corp Allocation In:", [2026, 2027, 2028, 2029], index=1)
+
+st.markdown("---")
+
+st.caption("Hiring & Sales:")
+attrition = st.number_input("Attrition %", value=10, step=1, min_value=0)
+hire_cost = st.number_input("Hire Cost ($)", value=12000, format="%d")
+sales_trigger = st.number_input("Rev per Sales Rep", value=3000000, format="%d")
+sales_rep_cost = 120000
+
+inflation_pct = st.number_input("Inflation %", value=3.0, step=0.5)
+inflation = inflation_pct / 100
+
+# Live calc of 2026 Total
+total_2026_input = tm_service_base + s_job_base + spares_base
+
+st.markdown(f"""
+       <div class='resource-box'>
+       <b>2026 Check:</b><br>
+       Inputs Total: <b>${total_2026_input:,.0f}</b><br>
+       Target: <b>${target_2026:,.0f}</b><br>
+       Gap: <b style='color:{"green" if total_2026_input >= target_2026 else "red"}'>${total_2026_input - target_2026:,.0f}</b>
+       </div>
+       """, unsafe_allow_html=True)
+
+# --- BELOW THE LINE ---
+st.header("6. Below the Line (Estimates)")
+st.caption("Deductions from EBITDA to get Net Income.")
+depreciation_pct = st.number_input("Depreciation (% of Rev)", value=1.5, step=0.5)
+interest_expense = st.number_input("Annual Interest Exp ($)", value=0, step=10000, format="%d")
+tax_rate = st.number_input("Tax Rate %", value=25, step=1, min_value=0, max_value=50)
+
+# ==========================================
+# 2. LOGIC ENGINE
+# ==========================================
+
+def run_fusion_model():
+# --- STEP 1: CREATE 2025 ACTUALS ROW ---
+row_2025 = {
+"Year": 2025,
+"Total Revenue": act_total_rev,
+"Rev: Labor": act_rev_labor,
+"Rev: Job Parts": act_rev_parts,
+"Rev: S-Jobs": act_rev_sjob,
+"Rev: Spare Parts": act_rev_spares,
+"Total COGS": act_cogs,
+"Total OpEx": act_opex,
+"Gross Profit": act_total_rev - act_cogs,
+"Gross Margin %": (act_total_rev - act_cogs)/act_total_rev if act_total_rev else 0,
+"EBITDA": act_ebitda,
+"EBITDA Margin %": act_ebitda/act_total_rev if act_total_rev else 0,
+# Fill other columns with Base/NA for 2025
+"Techs": base_techs,
+"Locations": 1, 
+"Sales Reps": 0,
+"Total Hires": 0,
+"OpEx: Hiring": 0,
+"OpEx: Rent": 0, 
+"OpEx: Central": 0,
+"Eng FTE": base_me + base_ce + base_prog, # Approx
+"MEs": base_me, "CEs": base_ce, "Progs": base_prog, # Add these explicitly
+"Net Income": act_ebitda * (1 - (tax_rate/100)), # Rough est
+"Net Margin %": (act_ebitda * (1 - (tax_rate/100))) / act_total_rev if act_total_rev else 0,
+"D&A": 0, "Interest": 0, "Taxes": 0
+}
+
+# --- STEP 2: RUN PROJECTIONS 2026-2029 ---
+years = [2026, 2027, 2028, 2029]
+data = [row_2025]
+
+# Growth Trackers
+curr_service_target = tm_service_base
+curr_sjob_target = s_job_base
+curr_spares_target = spares_base
+
+# Staff Trackers
+cum_techs = base_techs
+cum_me = base_me
+cum_ce = base_ce
+cum_prog = base_prog
+
+prev_total_hc = base_techs + base_me + base_ce + base_prog
+
+for i, year in enumerate(years):
+# Inflation: 2026 is Year 1 (no inflation applied to inputs), 2027 is Year 2 (1 year inflation)
+inf = (1 + inflation) ** i
+
+# 1. INFLATED COSTS
+c_tech_inf = cost_tech * inf
+c_eng_inf = cost_eng * inf
+c_bill_inf = bill_rate * inf
+c_hire_inf = hire_cost * inf
+c_rent_inf = rent_per_loc * inf
+
+# 2. CALCULATE REVENUE STREAMS
+if i > 0:
+curr_service_target = curr_service_target * (1 + tm_growth/100)
+curr_sjob_target = curr_sjob_target * (1 + s_job_growth/100)
+curr_spares_target = curr_spares_target * (1 + spares_growth/100)
+
+# SPLIT SERVICE REVENUE
+curr_labor_target = curr_service_target * (labor_split_pct / 100)
+curr_job_parts_rev = curr_service_target * (1 - (labor_split_pct / 100))
+
+# Total Top Line
+total_rev = curr_labor_target + curr_job_parts_rev + curr_sjob_target + curr_spares_target
+
+# 3. RESOURCE LOADING
+# A. Techs for Service Labor
+labor_capacity_per_tech = 2080 * utilization * c_bill_inf
+techs_for_service = math.ceil(curr_labor_target / labor_capacity_per_tech)
+
+# B. Resources for S-Jobs
+sj_labor_budget = curr_sjob_target * (sj_lab_pct / 100)
+sj_tech_fte = (sj_labor_budget * w_tech) / (c_tech_inf * 2080)
+sj_me_fte = (sj_labor_budget * w_me) / (c_eng_inf * 2080)
+sj_ce_fte = (sj_labor_budget * w_ce) / (c_eng_inf * 2080)
+sj_prog_fte = (sj_labor_budget * w_prog) / (c_eng_inf * 2080)
+
+# C. Total Headcount Requirements
+req_techs = math.ceil(techs_for_service + sj_tech_fte)
+req_me = math.ceil(sj_me_fte)
+req_ce = math.ceil(sj_ce_fte)
+req_prog = math.ceil(sj_prog_fte)
+
+# 4. HIRING & ATTRITION
+new_techs = max(0, req_techs - cum_techs)
+cum_techs = max(cum_techs, req_techs)
+new_me = max(0, req_me - cum_me)
+cum_me = max(cum_me, req_me)
+new_ce = max(0, req_ce - cum_ce)
+cum_ce = max(cum_ce, req_ce)
+new_prog = max(0, req_prog - cum_prog)
+cum_prog = max(cum_prog, req_prog)
+
+growth_hires = new_techs + new_me + new_ce + new_prog
+attrition_count = math.ceil(prev_total_hc * (attrition/100))
+total_hires = growth_hires + attrition_count
+
+curr_total_hc = cum_techs + cum_me + cum_ce + cum_prog
+prev_total_hc = curr_total_hc
+
+# 5. OPERATIONS
+locs = math.ceil(cum_techs / techs_per_loc_input) 
+managers = math.ceil(cum_techs / 10)
+sales_reps = math.floor(total_rev / sales_trigger)
+
+# 6. FINANCIALS (OPERATING)
+
+# COGS
+cogs_labor_tech = cum_techs * 2080 * c_tech_inf
+total_eng_fte = sj_me_fte + sj_ce_fte + sj_prog_fte
+# CHARGEBACK LOGIC
+cogs_chargeback_eng = total_eng_fte * 2080 * c_eng_inf
+
+cogs_job_parts = curr_job_parts_rev * (1 - (job_parts_margin/100))
+cogs_spares = curr_spares_target * (1 - (spares_margin/100))
+cogs_sjob_mat = curr_sjob_target * (sj_mat_pct/100)
+
+total_cogs = cogs_labor_tech + cogs_chargeback_eng + cogs_job_parts + cogs_spares + cogs_sjob_mat
+gross_profit = total_rev - total_cogs
+
+# OpEx
+if is_hq_free:
+billable_locs = max(0, locs - 1)
+else:
+billable_locs = locs
+
+opex_rent = billable_locs * c_rent_inf * 12
+
+if year >= central_start_year and locs > 1:
+central_fee = central_cost * 12 * inf
+else:
+central_fee = 0
+
+opex_mgr = managers * (85000 * 1.2 * inf)
+opex_sales = sales_reps * (sales_rep_cost * inf)
+opex_hire = total_hires * c_hire_inf
+
+total_opex = opex_rent + opex_mgr + opex_sales + central_fee + opex_hire
+
+# 7. EBITDA (OPERATING PROFIT)
+ebitda = gross_profit - total_opex
+
+# 8. BELOW THE LINE (NET INCOME)
+da_cost = total_rev * (depreciation_pct / 100)
+ebit = ebitda - da_cost
+interest = interest_expense
+ebt = ebit - interest
+taxes = ebt * (tax_rate / 100) if ebt > 0 else 0
+net_income = ebt - taxes
+
+data.append({
+"Year": year,
+"Total Revenue": total_rev,
+"Rev: Labor": curr_labor_target,
+"Rev: Job Parts": curr_job_parts_rev,
+"Rev: S-Jobs": curr_sjob_target,
+"Rev: Spare Parts": curr_spares_target,
+# MARGINS
+"Gross Profit": gross_profit,
+"Gross Margin %": gross_profit/total_rev,
+"EBITDA": ebitda,
+"EBITDA Margin %": ebitda/total_rev,
+"Net Income": net_income,
+"Net Margin %": net_income/total_rev,
+# DETAILS
+"Techs": cum_techs,
+"MEs": cum_me,
+"CEs": cum_ce,
+"Progs": cum_prog,
+"Locations": locs,
+"Sales Reps": sales_reps,
+"Total Hires": total_hires,
+"OpEx: Hiring": opex_hire,
+"Eng FTE": total_eng_fte,
+"OpEx: Rent": opex_rent,
+"OpEx: Central": central_fee,
+"Total COGS": total_cogs,
+"Total OpEx": total_opex,
+# BTL
+"D&A": da_cost,
+"Interest": interest,
+"Taxes": taxes
+})
+
+return pd.DataFrame(data)
+
+df = run_fusion_model()
+
+# ==========================================
+# 3. TOP ROW: SCORECARDS (Side-by-Side)
+# ==========================================
+
+yr1 = df.iloc[1] # 2026 (Index 1)
+yr4 = df.iloc[-1] # 2029 (Last)
+
+c1, c2, c3 = st.columns(3)
+
+with c1:
+gap_26 = yr1['Total Revenue'] - target_2026
+color_26 = "green" if gap_26 >= 0 else "red"
+label_26 = "Surplus" if gap_26 >= 0 else "Shortfall"
+
+st.markdown(f"""
+   <div class='goal-box' style='border-left: 10px solid {color_26}; background-color: {"#e8f5e9" if gap_26 >= 0 else "#ffebee"};'>
+   <h4>2026 Performance</h4>
+   <span class='metric-label'>Projected vs Target</span><br>
+   <span class='metric-value'>${yr1['Total Revenue']:,.0f}</span><br>
+   <span style='color:{color_26}; font-weight:bold;'>{'+' if gap_26>=0 else ''}${gap_26:,.0f} {label_26}</span>
+   </div>
+   """, unsafe_allow_html=True)
+
+with c2:
+gap_29 = yr4['Total Revenue'] - exit_target
+color_29 = "green" if gap_29 >= 0 else "red"
+label_29 = "Surplus" if gap_29 >= 0 else "Shortfall"
+
+st.markdown(f"""
+   <div class='goal-box' style='border-left: 10px solid {color_29}; background-color: {"#e8f5e9" if gap_29 >= 0 else "#ffebee"};'>
+   <h4>2029 Exit Status</h4>
+   <span class='metric-label'>Projected vs Target</span><br>
+   <span class='metric-value'>${yr4['Total Revenue']:,.0f}</span><br>
+   <span style='color:{color_29}; font-weight:bold;'>{'+' if gap_29>=0 else ''}${gap_29:,.0f} {label_29}</span>
+   </div>
+   """, unsafe_allow_html=True)
+
+with c3:
+lab_cap = 2080 * utilization * bill_rate
+ticket_cap = lab_cap / (labor_split_pct/100)
+parts_cap = ticket_cap - lab_cap
+
+st.markdown(f"""
+   <div class='info-box'>
+   <h4>💡 Tech Revenue Reality</h4>
+   <span class='metric-label'>Rev per 1 Tech (Full Utilization)</span><br>
+   <span class='metric-value'>${ticket_cap:,.0f}</span><br>
+   <span style='font-size:12px; color:#333;'>(${lab_cap:,.0f} Labor + ${parts_cap:,.0f} Parts)</span>
+   </div>
+   """, unsafe_allow_html=True)
+
+st.divider()
+
+# ==========================================
+# 4. CHART SECTION (Full Width)
+# ==========================================
+
+st.subheader("Revenue Path to Exit (With EBITDA Margin)")
+fig, ax = plt.subplots(figsize=(10, 5))
+
+years = df['Year']
+# Stacked Bars
+p1 = ax.bar(years, df['Rev: Labor'], label='Service Labor', color='#1565c0')
+p2 = ax.bar(years, df['Rev: Job Parts'], bottom=df['Rev: Labor'], label='Job Parts', color='#64b5f6')
+p3 = ax.bar(years, df['Rev: S-Jobs'], bottom=df['Rev: Labor']+df['Rev: Job Parts'], label='S-Jobs', color='#ffb74d')
+p4 = ax.bar(years, df['Rev: Spare Parts'], bottom=df['Rev: Labor']+df['Rev: Job Parts']+df['Rev: S-Jobs'], label='Spare Parts', color='#81c784')
+
+# Add Data Labels (Compact Millions)
+for container in ax.containers:
+labels = [f'${v/1000000:.1f}M' if v > 100000 else "" for v in container.datavalues]
+ax.bar_label(container, labels=labels, label_type='center', color='white', fontsize=9, padding=0)
+
+# EBITDA Line on Secondary Axis (NOW PERCENTAGE)
+ax2 = ax.twinx()
+ax2.plot(years, df['EBITDA Margin %'] * 100, color='#212121', linestyle='-', linewidth=3, marker='o', label='EBITDA Margin')
+ax2.set_ylabel('EBITDA Margin (%)', color='#212121')
+
+# Combined Legend logic - MOVED TO BOTTOM
+lines, labels = ax.get_legend_handles_labels()
+lines2, labels2 = ax2.get_legend_handles_labels()
+ax.legend(lines + lines2, labels + labels2, loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=3, frameon=False)
+
+# Target Lines
+ax.axhline(y=exit_target, color='red', linestyle='--', linewidth=2)
+ax.text(2026.5, exit_target, f" Exit: ${exit_target/1000000:.1f}M", color='red', va='bottom', fontweight='bold')
+
+ax.axhline(y=target_2026, color='blue', linestyle=':', linewidth=2)
+ax.text(2026.1, target_2026, f" Year 1: ${target_2026/1000000:.1f}M", color='blue', va='bottom', fontsize=8)
+
+# Format Axes
+ax.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
+ax2.yaxis.set_major_formatter(mtick.PercentFormatter(decimals=0))
+
+ax.spines['top'].set_visible(False)
+plt.tight_layout()
+
+st.pyplot(fig)
+
+st.divider()
+
+# ==========================================
+# 5. AUDIT CENTER (TABBED)
+# ==========================================
+
+st.subheader("🔍 Audit Center")
+
+tab1, tab2, tab3 = st.tabs(["💰 Detailed P&L Waterfall", "👥 Headcount Path", "📊 Hiring & Ops"])
+
+def format_df(d, m): return d.style.format(m)
+
+with tab1:
+st.markdown("### P&L Statement (The Waterfall)")
+st.info("Includes 2025 Actuals (Baseline) -> 2029 Projections.")
+
+# Selecting columns in logical P&L order
+cols_pl = ['Year', 
+'Total Revenue', 
+'Total COGS', 
+'Gross Profit', 
+'Total OpEx', 
+'EBITDA', 'EBITDA Margin %',
+'D&A', 'Interest', 'Taxes',
+'Net Income', 'Net Margin %']
+
+fmt = {
+'Year': '{:.0f}', 
+'EBITDA Margin %': '{:.1%}', 
+'Net Margin %': '{:.1%}'
+}
+# Currency format for the rest
+for c in cols_pl:
+if c not in fmt: fmt[c] = "${:,.0f}"
+
+st.dataframe(format_df(df[cols_pl], fmt), use_container_width=True)
+
+with tab2:
+st.markdown("### Resource Path")
+cols = ['Year', 'Techs', 'MEs', 'CEs', 'Progs', 'Locations', 'Sales Reps']
+fmt = {'Year':'{:.0f}', 'Techs':'{:.0f}', 'MEs':'{:.0f}', 'CEs':'{:.0f}', 'Progs':'{:.0f}', 'Locations':'{:.0f}', 'Sales Reps':'{:.0f}'}
+st.dataframe(format_df(df[cols], fmt), use_container_width=True)
+
+with tab3:
+st.markdown("### Hiring & Operations Audit")
+cols = ['Year', 'Total Hires', 'OpEx: Hiring', 'OpEx: Rent', 'OpEx: Central']
+fmt = {'Year':'{:.0f}', 'Total Hires':'{:.0f}', 'OpEx: Hiring':'${:,.0f}', 'OpEx: Rent':'${:,.0f}', 'OpEx: Central':'${:,.0f}'}
+st.dataframe(format_df(df[cols], fmt), use_container_width=True)
+st.markdown(f"""
+   <div class='audit-box'>
+   <b>Rent Rule:</b> HQ Free = {is_hq_free}. You pay for Locs-1.<br>
+   <b>Central Rule:</b> Starts in {central_start_year} AND requires > 1 Location.
+   </div>
+   """, unsafe_allow_html=True)
