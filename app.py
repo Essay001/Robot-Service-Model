@@ -73,10 +73,18 @@ with st.sidebar:
     
     with st.expander("Talent Assumptions (Base Pay)"):
         st.markdown("**Green Tech (Junior)**")
-        g_base = st.number_input("Green Base ($)", value=75000, help="Base Salary for a Junior Tech.")
+        g_base = st.number_input(
+            "Green Base ($)", 
+            value=75000, 
+            help="Base Salary for a Junior Tech. Assumes 12 Month Ramp Up."
+        )
         
         st.markdown("**Rebadge Tech (Senior)**")
-        r_base = st.number_input("Rebadge Base ($)", value=130000, help="Base Salary for a Senior/Rebadge Tech.")
+        r_base = st.number_input(
+            "Rebadge Base ($)", 
+            value=130000, 
+            help="Base Salary for a Senior/Rebadge Tech. Assumes 1 Month Ramp Up."
+        )
         
         # Burden Calc
         def calc_burden(base): return base + (base * 0.11) + 23000
@@ -96,14 +104,14 @@ with st.sidebar:
     # --- ACTUALS SECTION ---
     with st.expander("📝 Input 2025 Actuals (Baseline)", expanded=False):
         st.caption("Enter your real FY2025 numbers here to set the baseline.")
-        act_rev_labor = st.number_input("2025 Labor Rev", value=1200000, step=10000, format="%d")
-        act_rev_parts = st.number_input("2025 Job Parts Rev", value=300000, step=10000, format="%d")
+        act_rev_labor = st.number_input("2025 Labor Rev", value=900000, step=10000, format="%d")
+        act_rev_parts = st.number_input("2025 Job Parts Rev", value=425000, step=10000, format="%d")
         act_rev_sjob = st.number_input("2025 S-Job Rev", value=750000, step=10000, format="%d")
         act_rev_spares = st.number_input("2025 Spare Parts Rev", value=110000, step=10000, format="%d")
         
         st.markdown("---")
         act_cogs = st.number_input("2025 Total COGS", value=1400000, step=10000, format="%d", help="Total Cost of Goods Sold from your 2025 P&L.")
-        act_opex = st.number_input("2025 Total OpEx", value=800000, step=10000, format="%d", help="Total Operating Expenses (Rent, Admin, Sales) from your 2025 P&L.")
+        act_opex = st.number_input("2025 Total OpEx", value=425000, step=10000, format="%d", help="Total Operating Expenses (Rent, Admin, Sales) from your 2025 P&L.")
 
         # Calculate derived 2025 stats
         act_total_rev = act_rev_labor + act_rev_parts + act_rev_sjob + act_rev_spares
