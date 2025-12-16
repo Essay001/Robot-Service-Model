@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 
 # --- PAGE CONFIGURATION ---
-st.set_page_config(page_title="2029 Strategic Exit Model (Reality Check)", layout="wide")
+st.set_page_config(page_title="2029 Strategic Exit Model (Master)", layout="wide")
 
 st.markdown("""
 <style>
@@ -22,7 +22,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🚀 2029 Strategic Exit Model")
-st.markdown("The **Full Operational Model** + **Talent Reality Checks** (Rework & Retention).")
+st.markdown("The **Full Operational Model** (Matrix/S-Jobs) + **Talent Reality Checks** (Ramp/Rework).")
 
 # ==========================================
 # 1. SIDEBAR: THE CONTROL TOWER
@@ -71,15 +71,15 @@ with st.sidebar:
         help="0% = Hiring all Junior 'Green' Techs. 100% = Hiring all Senior 'Rebadge' Techs."
     )
     
-    with st.expander("Talent Assumptions (Base Pay)"):
+    with st.expander("Talent Assumptions (Base Pay & Ramp)"):
         st.markdown("**Green Tech (Junior)**")
         g_base = st.number_input("Green Base ($)", value=75000, help="Starting Base Salary.")
-        # RAMP: 12 Months
+        # RAMP: 12 Months (50% productivity in Year 1)
         g_ramp_yr1_factor = 0.50 
         
         st.markdown("**Rebadge Tech (Senior)**")
         r_base = st.number_input("Rebadge Base ($)", value=130000, help="Starting Base Salary.")
-        # RAMP: 1 Month
+        # RAMP: 1 Month (92% productivity in Year 1)
         r_ramp_yr1_factor = 0.92
         
         # Burden Calc Helper
@@ -92,9 +92,12 @@ with st.sidebar:
         # Weighted Ramp (Capacity in Year 1)
         w_ramp_factor = (g_ramp_yr1_factor * green_ratio) + (r_ramp_yr1_factor * rebadge_ratio)
         
+        w_cost_tech = (calc_burden(g_base) * green_ratio) + (calc_burden(r_base) * rebadge_ratio)
+        
         st.warning(f"**New Hire Efficiency:** {w_ramp_factor*100:.0f}%\n(Avg productivity in Year 1)")
+        st.info(f"**Blended Tech Cost:** ${w_cost_tech:,.0f}/yr")
 
-    # --- NEW REALITY FACTORS ---
+    # --- REALITY FACTORS ---
     with st.expander("⚠️ Reality Factors (The 'Mistake Tax')", expanded=True):
         st.caption("The hidden costs of cheaper labor.")
         
@@ -104,13 +107,11 @@ with st.sidebar:
         
         w_rework_pct = (rework_rebadge * rebadge_ratio) + (rework_green * green_ratio)
         st.write(f"Weighted Rework Cost: **{w_rework_pct*100:.1f}% of Revenue**")
-        st.caption(f"(Rebadge: {rework_rebadge*100}% | Green: {rework_green*100}%)")
         
         st.markdown("---")
         st.markdown("#### 2. Salary Graduation")
-        st.caption("Green techs don't stay cheap forever.")
         grad_year = 2028 # Year 3
-        grad_raise = st.number_input("Green Raise in Year 3 ($)", value=35000, help="How much does Green Salary increase once they are trained?")
+        grad_raise = st.number_input("Green Raise in Year 3 ($)", value=35000, help="Salary bump once Green techs become fully trained.")
         
         st.info(f"In {grad_year}, Green Base jumps to **${(g_base + grad_raise)/1000:.0f}k**")
 
@@ -169,16 +170,14 @@ with st.sidebar:
         target_margin_mat = st.slider("Margin on Material %", 0, 50, 20)
         target_margin_lab = st.slider("Margin on Labor %", 0, 80, 50)
         
-        calc_mat_cost_pct = (mix_mat_pct/100) * (1 - target_margin_mat/100)
-        calc_lab_cost_pct = (mix_lab_pct/100) * (1 - target_margin_lab/100)
-        
         st.markdown(f"""
         <div style='background-color:#eee; padding:5px; border-radius:5px; font-size:12px;'>
         <b>Resulting Project Profile:</b><br>
-        Blended Margin: <b>{((1 - (calc_mat_cost_pct + calc_lab_cost_pct))*100):.1f}%</b><br>
+        Blended Margin: <b>{((1 - ((mix_mat_pct/100)*(1-target_margin_mat/100) + (mix_lab_pct/100)*(1-target_margin_lab/100)))*100):.1f}%</b><br>
         </div>
         """, unsafe_allow_html=True)
 
+        # --- RESTORED RESOURCE SPLIT ---
         st.divider()
         st.caption("Resource Split (Of the Labor Portion):")
         c1, c2 = st.columns(2)
@@ -229,6 +228,13 @@ with st.sidebar:
     inflation_pct = st.number_input("Inflation %", value=3.0, step=0.5)
     inflation = inflation_pct / 100
 
+    # --- RESTORED BELOW THE LINE ---
+    st.header("6. Below the Line (Estimates)")
+    st.caption("Deductions from EBITDA to get Net Income.")
+    depreciation_pct = st.number_input("Depreciation (% of Rev)", value=1.5, step=0.5)
+    interest_expense = st.number_input("Annual Interest Exp ($)", value=0, step=10000, format="%d")
+    tax_rate = st.number_input("Tax Rate %", value=25, step=1, min_value=0, max_value=50)
+
 # ==========================================
 # 2. LOGIC ENGINE
 # ==========================================
@@ -270,7 +276,6 @@ def run_fusion_model():
         inf = (1 + inflation) ** (i + 1)
 
         # --- DYNAMIC TECH COST (GRADUATION LOGIC) ---
-        # If year >= grad_year (2028), base green salary increases
         current_g_base = g_base
         if year >= grad_year:
             current_g_base += grad_raise
@@ -278,12 +283,10 @@ def run_fusion_model():
         g_cost_curr = calc_burden(current_g_base)
         r_cost_curr = calc_burden(r_base)
         
-        # Recalc weighted cost for this specific year
         w_cost_tech_annual = (g_cost_curr * green_ratio) + (r_cost_curr * rebadge_ratio)
         tech_annual_inf = w_cost_tech_annual * inf
         c_tech_inf = tech_annual_inf / 2080 
 
-        # Engineer Cost
         eng_annual = eng_base + (eng_base * 0.11) + 23000
         eng_annual_inf = eng_annual * inf
         c_eng_inf = eng_annual_inf / 2080
@@ -302,17 +305,18 @@ def run_fusion_model():
         curr_job_parts_rev = curr_service_target * (1 - (labor_split_pct / 100))
         total_rev = curr_labor_target + curr_job_parts_rev + curr_sjob_target + curr_spares_target
 
-        # 3. RESOURCE LOADING
-        # Service Techs (with Ramp)
+        # 3. RESOURCE LOADING (WITH RESTORED SPLIT LOGIC)
+        # Service Techs
         full_capacity_per_tech = 2080 * utilization * c_bill_inf
         existing_capacity_rev = cum_techs * full_capacity_per_tech
         gap_revenue = max(0, curr_labor_target - existing_capacity_rev)
         new_hire_yr1_capacity = full_capacity_per_tech * w_ramp_factor
         needed_new_techs_service = math.ceil(gap_revenue / new_hire_yr1_capacity)
         
-        # S-Jobs
+        # S-Jobs (Using Restored w_tech, w_me, etc.)
         s_job_labor_revenue = curr_sjob_target * (mix_lab_pct/100)
         s_job_labor_cost_budget = s_job_labor_revenue * (1 - (target_margin_lab/100))
+        
         sj_tech_fte = (s_job_labor_cost_budget * w_tech) / tech_annual_inf
         sj_me_fte = (s_job_labor_cost_budget * w_me) / eng_annual_inf
         sj_ce_fte = (s_job_labor_cost_budget * w_ce) / eng_annual_inf
@@ -360,7 +364,7 @@ def run_fusion_model():
         opex_sales = sales_reps * (sales_rep_cost * inf)
         opex_hire = total_hires * c_hire_inf
         
-        # --- REWORK CALCULATION (THE MISTAKE TAX) ---
+        # Rework Tax
         opex_rework = total_rev * w_rework_pct
 
         total_opex = base_overhead_curr + opex_rent + opex_hire + central_fee + opex_sales + opex_rework
