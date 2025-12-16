@@ -19,16 +19,21 @@ with st.sidebar:
     c_height = st.slider("Chart Height (Inches)", 3, 10, 4)
 
 # ==========================================
-# CHART 1: REVENUE BRIDGE (WATERFALL) - CORRECTED
+# CHART 1: REVENUE BRIDGE (WATERFALL) - STRICT MATH
 # ==========================================
 st.header("Slide 1: The 'Revenue Bridge' (Waterfall)")
-st.caption("Explaining how we get from FY25 to the FY26 Target (Revenue Only).")
+st.caption("Explaining how we get from FY25 to the FY26 Target (Strict Math).")
 
 # Data for Waterfall
-# REPLACED "CSP Margin" with "Attached Parts Sales" (Truck Stock) which is actual Revenue
+# Baseline: $1.5M
+# Rebadge Labor: $672k (2 Techs * $336k)
+# Organic Parts: $30k (Growth from $120k to $150k)
+# Tech Parts: $100k (15% Attach Rate on Labor)
+# S-Job Growth: $200k (Growth from $400k base to $600k target)
+
 wf_data = {
-    'Category': ['FY25 Baseline', '+ Rebadge Labor', '+ Organic Parts Growth', '+ Tech Parts Sales', '+ S-Job Optimization', 'FY26 Target'],
-    'Value': [1.5, 0.85, 0.05, 0.08, 0.12, 0.0], # Values in Millions
+    'Category': ['FY25 Baseline', '+ Rebadge Labor', '+ Organic Parts', '+ Tech Parts (Attached)', '+ S-Job Growth', 'FY26 Target'],
+    'Value': [1.5, 0.672, 0.030, 0.100, 0.200, 0.0], # Values in Millions
     'Type': ['Base', 'Add', 'Add', 'Add', 'Add', 'Total']
 }
 df_wf = pd.DataFrame(wf_data)
@@ -60,9 +65,6 @@ ax1.grid(axis='y', linestyle='--', alpha=0.5)
 st.pyplot(fig1)
 
 st.divider()
-
-# ... (Keep Charts 2, 3, and 4 exactly as they were in the previous code) ...
-# I am re-including them below so you can copy-paste the whole file easily.
 
 # ==========================================
 # CHART 2: THE CASH FLOW J-CURVE
