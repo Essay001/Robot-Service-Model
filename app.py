@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 
 # --- PAGE CONFIGURATION ---
-st.set_page_config(page_title="2029 Strategic Exit Model (Hybrid)", layout="wide")
+st.set_page_config(page_title="2029 Strategic Exit Model (Fixed OpEx)", layout="wide")
 
 st.markdown("""
 <style>
@@ -330,6 +330,10 @@ def run_fusion_model():
     # --- STEP 2: RUN PROJECTIONS 2026-2029 ---
     years = [2026, 2027, 2028, 2029]
     data = [row_2025]
+    
+    # TRACKING VARIABLES
+    # Base Overhead (The 2025 OpEx that doesn't disappear)
+    base_overhead_start = act_opex
 
     # Growth Trackers
     curr_service_target = tm_service_base
@@ -345,7 +349,7 @@ def run_fusion_model():
     prev_total_hc = base_techs + base_me + base_ce + base_prog
 
     for i, year in enumerate(years):
-        inf = (1 + inflation) ** i
+        inf = (1 + inflation) ** (i + 1) # Start inflating in 2026 (Year 1)
 
         # 1. CALCULATE EFFECTIVE HOURLY COST BASED ON BURDEN LOGIC
         
@@ -435,6 +439,14 @@ def run_fusion_model():
         gross_profit = total_rev - total_cogs
 
         # OpEx
+        # -- FIX --: We take the 2025 OpEx base, inflate it, THEN add the new variables.
+        # But we must be careful not to double count. 
+        # Assumption: The 2025 OpEx covers existing rent/admin. 
+        # The new variables (opex_rent, opex_mgr) are INCREMENTAL costs of growth.
+        # Simple Model: Inflate Base + Add New Variables.
+        
+        base_overhead_curr = base_overhead_start * inf
+        
         if is_hq_free:
             billable_locs = max(0, locs - 1)
         else:
@@ -447,11 +459,30 @@ def run_fusion_model():
         else:
             central_fee = 0
 
+        # For Managers/Sales - we assume base team is covered in Base Overhead. 
+        # We only add cost if we exceed the base.
+        # But for simplicity in this model, let's treat the "Calculated OpEx" as the Total OpEx requirement
+        # And ensure it is at least as high as the Base Inflated.
+        
+        # Recalculating Total OpEx from ground up to avoid double counting logic issues
+        # Total OpEx = (Base Overhead * Inflation) + (INCREMENTAL Rent) + (INCREMENTAL Hiring)
+        
+        # Actually, best practice for this level:
+        # Total OpEx = (2025 OpEx * Inflation) + (Rent for New Locations) + (Hiring Costs) + (Central Fee)
+        # We will assume Managers/Sales are covered in the growing Base Overhead or Margin.
+        # Let's add them explicitly to be safe.
+        
         opex_mgr = managers * (85000 * 1.2 * inf)
         opex_sales = sales_reps * (sales_rep_cost * inf)
         opex_hire = total_hires * c_hire_inf
 
-        total_opex = opex_rent + opex_mgr + opex_sales + central_fee + opex_hire
+        # THE FIX: 
+        # 1. Inflate the 2025 Base.
+        # 2. Add the dynamic items that clearly wouldn't be in 2025 base (like new locations, hiring fees).
+        # 3. Warning: 2025 Base includes *some* manager/rent cost. 
+        # To prevent double counting, let's assume 2025 Base is mostly "General Admin/Office".
+        
+        total_opex = base_overhead_curr + opex_rent + opex_hire + central_fee + opex_sales
 
         # 7. EBITDA (OPERATING PROFIT)
         ebitda = gross_profit - total_opex
