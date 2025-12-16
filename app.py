@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 
 # --- PAGE CONFIGURATION ---
-st.set_page_config(page_title="2029 Strategic Exit Model (Fixed OpEx)", layout="wide")
+st.set_page_config(page_title="2029 Strategic Exit Model (Corrected)", layout="wide")
 
 st.markdown("""
 <style>
@@ -68,23 +68,15 @@ with st.sidebar:
     mix_pct = st.slider(
         "Hiring Mix (% Rebadge)", 
         0, 100, 50, 
-        help="0% = Hiring all Junior 'Green' Techs (Cheaper, slower ramp). 100% = Hiring all Senior 'Rebadge' Techs (Expensive, instant revenue)."
+        help="0% = Hiring all Junior 'Green' Techs. 100% = Hiring all Senior 'Rebadge' Techs. Higher Rebadge % increases Utilization."
     )
     
     with st.expander("Talent Assumptions (Base Pay)"):
         st.markdown("**Green Tech (Junior)**")
-        g_base = st.number_input(
-            "Green Base ($)", 
-            value=75000, 
-            help="Base Salary for a Junior Tech. Assumes 12 Month Ramp Up."
-        )
+        g_base = st.number_input("Green Base ($)", value=75000)
         
         st.markdown("**Rebadge Tech (Senior)**")
-        r_base = st.number_input(
-            "Rebadge Base ($)", 
-            value=130000, 
-            help="Base Salary for a Senior/Rebadge Tech. Assumes 1 Month Ramp Up."
-        )
+        r_base = st.number_input("Rebadge Base ($)", value=130000)
         
         # Burden Calc
         def calc_burden(base): return base + (base * 0.11) + 23000
@@ -144,14 +136,26 @@ with st.sidebar:
     disp_parts = tm_service_base * (1 - (labor_split_pct/100))
     st.markdown(f"<div class='split-box'><b>2026 Breakdown:</b><br>🛠️ Labor: <b>${disp_labor:,.0f}</b><br>⚙️ Job Parts: <b>${disp_parts:,.0f}</b></div>", unsafe_allow_html=True)
 
-    with st.expander("Service Settings"):
+    # --- UPDATED UTILIZATION LOGIC ---
+    with st.expander("Service Settings (Efficiency)", expanded=True):
+        st.markdown("#### ⚡ Dynamic Utilization")
+        st.caption("Efficiency scales with your Talent Mix.")
+        
+        # Hard limits for efficiency
+        max_util_rebadge = 0.85 # Rebadges are highly efficient
+        max_util_green = 0.65   # Green techs are less efficient
+        
+        # Weighted Average Utilization
+        calc_utilization = (max_util_rebadge * rebadge_ratio) + (max_util_green * green_ratio)
+        
+        st.markdown(f"""
+        <div style='background-color:#fff3e0; padding:10px; border-radius:5px;'>
+        <b>Effectve Utilization: {calc_utilization*100:.1f}%</b><br>
+        <small>({max_util_rebadge*100:.0f}% Rebadge vs {max_util_green*100:.0f}% Green)</small>
+        </div>
+        """, unsafe_allow_html=True)
+        
         bill_rate = st.number_input("Bill Rate ($/hr)", value=210, format="%d")
-        utilization_pct = st.number_input(
-            "Tech Utilization %", 
-            value=80, step=1, min_value=10, max_value=100,
-            help="What % of a 2,080 hour year is billed? 80% is standard."
-        )
-        utilization = utilization_pct / 100
         job_parts_margin = st.number_input("Job Parts Margin %", value=30, step=1, min_value=0, max_value=100, help="Profit margin on parts sold during service calls.")
 
     st.divider()
@@ -382,7 +386,8 @@ def run_fusion_model():
 
         # 3. RESOURCE LOADING
         # A. Techs for Service Labor
-        labor_capacity_per_tech = 2080 * utilization * c_bill_inf
+        # USE THE DYNAMIC UTILIZATION
+        labor_capacity_per_tech = 2080 * calc_utilization * c_bill_inf
         techs_for_service = math.ceil(curr_labor_target / labor_capacity_per_tech)
 
         # B. Resources for S-Jobs
@@ -439,12 +444,7 @@ def run_fusion_model():
         gross_profit = total_rev - total_cogs
 
         # OpEx
-        # -- FIX --: We take the 2025 OpEx base, inflate it, THEN add the new variables.
-        # But we must be careful not to double count. 
-        # Assumption: The 2025 OpEx covers existing rent/admin. 
-        # The new variables (opex_rent, opex_mgr) are INCREMENTAL costs of growth.
-        # Simple Model: Inflate Base + Add New Variables.
-        
+        # -- FIX --: Inflate Base + Add New Variables.
         base_overhead_curr = base_overhead_start * inf
         
         if is_hq_free:
@@ -458,30 +458,11 @@ def run_fusion_model():
             central_fee = central_cost * 12 * inf
         else:
             central_fee = 0
-
-        # For Managers/Sales - we assume base team is covered in Base Overhead. 
-        # We only add cost if we exceed the base.
-        # But for simplicity in this model, let's treat the "Calculated OpEx" as the Total OpEx requirement
-        # And ensure it is at least as high as the Base Inflated.
-        
-        # Recalculating Total OpEx from ground up to avoid double counting logic issues
-        # Total OpEx = (Base Overhead * Inflation) + (INCREMENTAL Rent) + (INCREMENTAL Hiring)
-        
-        # Actually, best practice for this level:
-        # Total OpEx = (2025 OpEx * Inflation) + (Rent for New Locations) + (Hiring Costs) + (Central Fee)
-        # We will assume Managers/Sales are covered in the growing Base Overhead or Margin.
-        # Let's add them explicitly to be safe.
         
         opex_mgr = managers * (85000 * 1.2 * inf)
         opex_sales = sales_reps * (sales_rep_cost * inf)
         opex_hire = total_hires * c_hire_inf
 
-        # THE FIX: 
-        # 1. Inflate the 2025 Base.
-        # 2. Add the dynamic items that clearly wouldn't be in 2025 base (like new locations, hiring fees).
-        # 3. Warning: 2025 Base includes *some* manager/rent cost. 
-        # To prevent double counting, let's assume 2025 Base is mostly "General Admin/Office".
-        
         total_opex = base_overhead_curr + opex_rent + opex_hire + central_fee + opex_sales
 
         # 7. EBITDA (OPERATING PROFIT)
@@ -572,7 +553,7 @@ with c2:
     """, unsafe_allow_html=True)
 
 with c3:
-    lab_cap = 2080 * utilization * bill_rate
+    lab_cap = 2080 * calc_utilization * bill_rate
     ticket_cap = lab_cap / (labor_split_pct/100)
     
     st.markdown(f"""
