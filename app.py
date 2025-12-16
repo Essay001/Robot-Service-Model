@@ -30,16 +30,31 @@ st.markdown("The **Full Operational Model** (Matrix/S-Jobs) + **Talent Strategy*
 
 with st.sidebar:
     st.header("🎯 The Exit Goal")
+    st.caption("How much do you want to sell the company for?")
+    
     # THE ANCHOR
-    exit_target_val = st.number_input("Target Exit Valuation ($)", value=7500000, step=250000, format="%d")
-    valuation_multiple = st.number_input("EBITDA Multiple", value=6.5, step=0.5)
+    exit_target_val = st.number_input(
+        "Target Exit Valuation ($)", 
+        value=7500000, 
+        step=250000, 
+        format="%d",
+        help="The 'Walk Away' check size you want in 2029. Calculated as 2029 EBITDA × Multiple."
+    )
+    
+    valuation_multiple = st.number_input(
+        "EBITDA Multiple", 
+        value=6.5, 
+        step=0.5,
+        help="The multiplier a PE firm pays for your profit. Service firms usually trade at 4x-8x EBITDA. Higher growth/margins = Higher Multiple."
+    )
     
     # Calculate Required EBITDA
     req_ebitda = exit_target_val / valuation_multiple
     st.markdown(f"""
     <div style='background-color:#dcedc8; padding:5px; border-radius:5px; text-align:center;'>
     <b>REQUIRED 2029 EBITDA</b><br>
-    <span style='font-size:18px; font-weight:bold;'>${req_ebitda:,.0f}</span>
+    <span style='font-size:18px; font-weight:bold;'>${req_ebitda:,.0f}</span><br>
+    <small>(Target ${exit_target_val/1000000:.1f}M ÷ {valuation_multiple}x)</small>
     </div>
     """, unsafe_allow_html=True)
 
@@ -50,14 +65,18 @@ with st.sidebar:
     st.caption("Green vs. Rebadge Mix")
     
     # The Slider
-    mix_pct = st.slider("Hiring Mix (% Rebadge)", 0, 100, 50, help="0% = All Green Techs. 100% = All Rebadge.")
+    mix_pct = st.slider(
+        "Hiring Mix (% Rebadge)", 
+        0, 100, 50, 
+        help="0% = Hiring all Junior 'Green' Techs (Cheaper, slower ramp). 100% = Hiring all Senior 'Rebadge' Techs (Expensive, instant revenue)."
+    )
     
-    with st.expander("Talent Assumptions"):
+    with st.expander("Talent Assumptions (Base Pay)"):
         st.markdown("**Green Tech (Junior)**")
-        g_base = st.number_input("Green Base ($)", value=75000)
+        g_base = st.number_input("Green Base ($)", value=75000, help="Base Salary for a Junior Tech.")
         
         st.markdown("**Rebadge Tech (Senior)**")
-        r_base = st.number_input("Rebadge Base ($)", value=130000)
+        r_base = st.number_input("Rebadge Base ($)", value=130000, help="Base Salary for a Senior/Rebadge Tech.")
         
         # Burden Calc
         def calc_burden(base): return base + (base * 0.11) + 23000
@@ -70,7 +89,7 @@ with st.sidebar:
         
         w_cost_tech = (g_cost * green_ratio) + (r_cost * rebadge_ratio)
         
-        st.info(f"**Blended Tech Cost:** ${w_cost_tech:,.0f}/yr")
+        st.info(f"**Blended Tech Cost:** ${w_cost_tech:,.0f}/yr\n\n(Includes 11% Tax + $23k Insurance)")
 
     st.divider()
 
@@ -83,8 +102,8 @@ with st.sidebar:
         act_rev_spares = st.number_input("2025 Spare Parts Rev", value=110000, step=10000, format="%d")
         
         st.markdown("---")
-        act_cogs = st.number_input("2025 Total COGS", value=1400000, step=10000, format="%d")
-        act_opex = st.number_input("2025 Total OpEx", value=800000, step=10000, format="%d")
+        act_cogs = st.number_input("2025 Total COGS", value=1400000, step=10000, format="%d", help="Total Cost of Goods Sold from your 2025 P&L.")
+        act_opex = st.number_input("2025 Total OpEx", value=800000, step=10000, format="%d", help="Total Operating Expenses (Rent, Admin, Sales) from your 2025 P&L.")
 
         # Calculate derived 2025 stats
         act_total_rev = act_rev_labor + act_rev_parts + act_rev_sjob + act_rev_spares
@@ -95,11 +114,23 @@ with st.sidebar:
 
     # --- REVENUE INPUTS ---
     st.header("2. Service Revenue")
-    tm_service_base = st.number_input("2026 Total Service Rev ($)", value=1500000, step=100000, format="%d")
-    tm_growth = st.number_input("Service Growth %", value=20, step=1, min_value=0, max_value=100)
+    tm_service_base = st.number_input(
+        "2026 Total Service Rev ($)", 
+        value=1500000, step=100000, format="%d",
+        help="Projected total revenue for T&M Service (Labor + Parts) for next year."
+    )
+    tm_growth = st.number_input(
+        "Service Growth %", 
+        value=20, step=1, min_value=0, max_value=100,
+        help="Annual organic growth rate for the Service business."
+    )
 
     st.subheader("Revenue Split")
-    labor_split_pct = st.number_input("Split: % from Labor", value=75, step=1, min_value=0, max_value=100)
+    labor_split_pct = st.number_input(
+        "Split: % from Labor", 
+        value=75, step=1, min_value=0, max_value=100,
+        help="Of the total Service Revenue, what % is billed labor? The rest is assumed to be Parts."
+    )
 
     disp_labor = tm_service_base * (labor_split_pct/100)
     disp_parts = tm_service_base * (1 - (labor_split_pct/100))
@@ -107,15 +138,19 @@ with st.sidebar:
 
     with st.expander("Service Settings"):
         bill_rate = st.number_input("Bill Rate ($/hr)", value=210, format="%d")
-        utilization_pct = st.number_input("Tech Utilization %", value=80, step=1, min_value=10, max_value=100)
+        utilization_pct = st.number_input(
+            "Tech Utilization %", 
+            value=80, step=1, min_value=10, max_value=100,
+            help="What % of a 2,080 hour year is billed? 80% is standard."
+        )
         utilization = utilization_pct / 100
-        job_parts_margin = st.number_input("Job Parts Margin %", value=30, step=1, min_value=0, max_value=100)
+        job_parts_margin = st.number_input("Job Parts Margin %", value=30, step=1, min_value=0, max_value=100, help="Profit margin on parts sold during service calls.")
 
     st.divider()
 
     st.header("3. S-Jobs (Projects)")
-    s_job_base = st.number_input("2026 S-Job Rev ($)", value=1000000, step=100000, format="%d")
-    s_job_growth = st.number_input("S-Job Growth %", value=15, step=1, min_value=0, max_value=100)
+    s_job_base = st.number_input("2026 S-Job Rev ($)", value=1000000, step=100000, format="%d", help="Projected total revenue for Projects/Integrations.")
+    s_job_growth = st.number_input("S-Job Growth %", value=15, step=1, min_value=0, max_value=100, help="Annual organic growth rate for Projects.")
 
     # --- UPDATED: MARGIN & MIX LOGIC ---
     with st.expander("S-Job Settings (Margin & Mix)"):
@@ -123,7 +158,11 @@ with st.sidebar:
         
         # 1. THE MIX
         st.markdown("**1. The Revenue Mix**")
-        mix_mat_pct = st.slider("% Material (Hardware/Subs)", 0, 100, 50, help="What % of the invoice is Hardware?")
+        mix_mat_pct = st.slider(
+            "% Material (Hardware/Subs)", 
+            0, 100, 50, 
+            help="On a $100k project, how much is Hardware/Material? (vs Labor)"
+        )
         mix_lab_pct = 100 - mix_mat_pct
         st.caption(f"Mix: {mix_mat_pct}% Material / {mix_lab_pct}% Labor")
         
@@ -131,8 +170,16 @@ with st.sidebar:
         
         # 2. THE MARGINS
         st.markdown("**2. Target Margins**")
-        target_margin_mat = st.slider("Margin on Material %", 0, 50, 20)
-        target_margin_lab = st.slider("Margin on Labor %", 0, 80, 50)
+        target_margin_mat = st.slider(
+            "Margin on Material %", 
+            0, 50, 20,
+            help="Profit margin on the hardware portion."
+        )
+        target_margin_lab = st.slider(
+            "Margin on Labor %", 
+            0, 80, 50,
+            help="Profit margin on the engineering portion. Used to set the labor budget."
+        )
         
         # Derived Cost % (For internal calcs)
         calc_mat_cost_pct = (mix_mat_pct/100) * (1 - target_margin_mat/100)
@@ -156,7 +203,7 @@ with st.sidebar:
     st.divider()
 
     st.header("4. Spare Parts (Direct)")
-    spares_base = st.number_input("2026 Spare Parts Rev ($)", value=150000, step=10000, format="%d")
+    spares_base = st.number_input("2026 Spare Parts Rev ($)", value=150000, step=10000, format="%d", help="Revenue from direct part sales (customers calling in).")
     spares_growth = st.number_input("Spare Parts Growth %", value=10, step=1, min_value=0, max_value=100)
     spares_margin = st.number_input("Spare Parts Margin %", value=35, step=1, min_value=0, max_value=100)
 
@@ -176,7 +223,7 @@ with st.sidebar:
         st.caption("Auto-Calculated Burden: Base + 11% Tax + $23k Insurance")
         
         # We use the Blended Tech cost from above
-        eng_base = st.number_input("Engineer Base Salary ($)", value=120000, step=5000)
+        eng_base = st.number_input("Engineer Base Salary ($)", value=120000, step=5000, help="Base salary for ME, CE, or Programmers.")
         
         # Helper Display
         eng_burd = eng_base + (eng_base * 0.11) + 23000
@@ -189,27 +236,35 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
         
-        techs_per_loc_input = st.number_input("Max Techs per Location", value=4)
+        techs_per_loc_input = st.number_input(
+            "Max Techs per Location", 
+            value=4,
+            help="When tech count exceeds this number, the model automatically adds a new location (and new rent)."
+        )
 
         # --- TIMING SECTION (OpEx) ---
         st.markdown("---")
         st.markdown("#### ⏳ Timing & Triggers (OpEx)")
         st.caption("These items contribute to your fixed Operating Expenses.")
-        rent_per_loc = st.number_input("Rent ($/mo)", value=5000, format="%d")
+        rent_per_loc = st.number_input("Rent ($/mo)", value=5000, format="%d", help="Monthly rent per facility.")
         is_hq_free = st.checkbox("Is HQ Rent Free?", value=True, help="If checked, you only pay rent for Location 2, 3, etc.")
 
-        central_cost = st.number_input("Corp Allocation (IT/HR) $/mo", value=8000, format="%d")
+        central_cost = st.number_input(
+            "Corp Allocation (IT/HR) $/mo", 
+            value=8000, format="%d",
+            help="Shared service fees (HR, IT, Finance) charged by HQ once you scale up."
+        )
         central_start_year = st.selectbox("Start Corp Allocation In:", [2026, 2027, 2028, 2029], index=1)
 
     st.markdown("---")
 
     st.caption("Hiring & Sales:")
-    attrition = st.number_input("Attrition %", value=10, step=1, min_value=0)
-    hire_cost = st.number_input("Hire Cost ($)", value=12000, format="%d")
-    sales_trigger = st.number_input("Rev per Sales Rep", value=3000000, format="%d")
+    attrition = st.number_input("Attrition %", value=10, step=1, min_value=0, help="Percentage of staff that quit each year. We must pay to replace them.")
+    hire_cost = st.number_input("Hire Cost ($)", value=12000, format="%d", help="Recruiting fees per new hire (Headhunter/Ads).")
+    sales_trigger = st.number_input("Rev per Sales Rep", value=3000000, format="%d", help="We hire 1 Sales Rep for every X dollars in revenue.")
     sales_rep_cost = 120000
 
-    inflation_pct = st.number_input("Inflation %", value=3.0, step=0.5)
+    inflation_pct = st.number_input("Inflation %", value=3.0, step=0.5, help="Annual increase in costs (Rent, Salary, etc).")
     inflation = inflation_pct / 100
 
     # Live calc of 2026 Total
@@ -226,9 +281,9 @@ with st.sidebar:
     # --- BELOW THE LINE ---
     st.header("6. Below the Line (Estimates)")
     st.caption("Deductions from EBITDA to get Net Income.")
-    depreciation_pct = st.number_input("Depreciation (% of Rev)", value=1.5, step=0.5)
-    interest_expense = st.number_input("Annual Interest Exp ($)", value=0, step=10000, format="%d")
-    tax_rate = st.number_input("Tax Rate %", value=25, step=1, min_value=0, max_value=50)
+    depreciation_pct = st.number_input("Depreciation (% of Rev)", value=1.5, step=0.5, help="Estimate for asset write-downs (Vehicles, Computers).")
+    interest_expense = st.number_input("Annual Interest Exp ($)", value=0, step=10000, format="%d", help="Interest payments on any debt.")
+    tax_rate = st.number_input("Tax Rate %", value=25, step=1, min_value=0, max_value=50, help="Estimated corporate tax rate.")
 
 # ==========================================
 # 2. LOGIC ENGINE
