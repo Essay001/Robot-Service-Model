@@ -25,15 +25,15 @@ st.header("Slide 1: The 'Revenue Bridge' (Waterfall)")
 st.caption("Explaining how we get from FY25 to the FY26 Target (Strict Math).")
 
 # Data for Waterfall
-# Baseline: $1.5M
+# Baseline: $1.35M
 # Rebadge Labor: $672k (2 Techs * $336k)
 # Organic Parts: $30k (Growth from $120k to $150k)
-# Tech Parts: $100k (15% Attach Rate on Labor)
+# Tech Parts: $50k (7.5% Attach Rate on Labor)
 # S-Job Growth: $200k (Growth from $400k base to $600k target)
 
 wf_data = {
     'Category': ['FY25 Baseline', '+ Rebadge Labor', '+ Organic Parts', '+ Tech Parts (Attached)', '+ S-Job Growth', 'FY26 Target'],
-    'Value': [1.5, 0.672, 0.030, 0.100, 0.200, 0.0], # Values in Millions
+    'Value': [1.35, 0.672, 0.030, 0.050, 0.200, 0.0], # Values in Millions
     'Type': ['Base', 'Add', 'Add', 'Add', 'Add', 'Total']
 }
 df_wf = pd.DataFrame(wf_data)
