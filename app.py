@@ -79,11 +79,43 @@ with st.sidebar:
     s_job_base = st.number_input("2026 S-Job Rev ($)", value=1000000, step=100000, format="%d")
     s_job_growth = st.number_input("S-Job Growth %", value=15, step=1, min_value=0, max_value=100)
 
-    with st.expander("S-Job Settings"):
-        sj_mat_pct = st.number_input("S-Job Mat Cost %", value=50, step=1)
-        sj_lab_pct = st.number_input("S-Job Labor Cost %", value=30, step=1)
+    # --- UPDATED: MARGIN & MIX LOGIC ---
+    with st.expander("S-Job Settings (Margin & Mix)"):
+        st.caption("How do you quote a typical project?")
+        
+        # 1. THE MIX
+        st.markdown("**1. The Revenue Mix**")
+        mix_mat_pct = st.slider("% Material (Hardware/Subs)", 0, 100, 50, help="What % of the invoice is Hardware?")
+        mix_lab_pct = 100 - mix_mat_pct
+        st.caption(f"Mix: {mix_mat_pct}% Material / {mix_lab_pct}% Labor")
+        
+        st.divider()
+        
+        # 2. THE MARGINS
+        st.markdown("**2. Target Margins**")
+        target_margin_mat = st.slider("Margin on Material %", 0, 50, 20)
+        target_margin_lab = st.slider("Margin on Labor %", 0, 80, 50)
+        
+        # Derived Cost % (For internal calcs)
+        # Cost = Revenue * (1 - Margin)
+        # We calculate the weighted cost % to use in the P&L
+        # Total Rev = 1.0. 
+        # Mat Rev = 0.5. Mat Cost = 0.5 * (1 - 0.2) = 0.4
+        # Lab Rev = 0.5. Lab Cost = 0.5 * (1 - 0.5) = 0.25
+        # Total Cost = 0.65. Total Margin = 0.35.
+        
+        calc_mat_cost_pct = (mix_mat_pct/100) * (1 - target_margin_mat/100)
+        calc_lab_cost_pct = (mix_lab_pct/100) * (1 - target_margin_lab/100)
+        
+        st.markdown(f"""
+        <div style='background-color:#eee; padding:5px; border-radius:5px; font-size:12px;'>
+        <b>Resulting Project Profile:</b><br>
+        Blended Margin: <b>{((1 - (calc_mat_cost_pct + calc_lab_cost_pct))*100):.1f}%</b><br>
+        </div>
+        """, unsafe_allow_html=True)
 
-        st.caption("Resource Split (Labor Portion):")
+        st.divider()
+        st.caption("Resource Split (Of the Labor Portion):")
         c1, c2 = st.columns(2)
         w_tech = c1.number_input("Tech %", value=20, format="%d")/100
         w_me = c2.number_input("ME %", value=40, format="%d")/100
@@ -108,7 +140,7 @@ with st.sidebar:
         base_ce = c_h1.number_input("Base CE", value=1)
         base_prog = c_h2.number_input("Base Prog", value=1)
 
-        # --- UPDATED BURDEN LOGIC ---
+        # --- BURDEN LOGIC ---
         st.markdown("#### 💸 Labor Cost (Burdened)")
         st.caption("Cost = Base + 11% Tax + $23k Insurance")
         
@@ -121,7 +153,7 @@ with st.sidebar:
         
         st.markdown(f"""
         <div style='font-size:12px; color:#555; background-color:#eee; padding:5px; border-radius:3px;'>
-        <b>Effectve Cost:</b><br>
+        <b>Effective Cost:</b><br>
         Tech: ${tech_burd:,.0f}/yr (${tech_burd/2080:.0f}/hr)<br>
         Eng: ${eng_burd:,.0f}/yr (${eng_burd/2080:.0f}/hr)
         </div>
@@ -224,17 +256,16 @@ def run_fusion_model():
         inf = (1 + inflation) ** i
 
         # 1. CALCULATE EFFECTIVE HOURLY COST BASED ON BURDEN LOGIC
-        # Logic: (Base + 11% + 23k) * Inflation / 2080
         
         # Tech Cost
         tech_annual = tech_base + (tech_base * 0.11) + 23000
         tech_annual_inf = tech_annual * inf
-        c_tech_inf = tech_annual_inf / 2080 # Derived hourly rate for existing logic
+        c_tech_inf = tech_annual_inf / 2080 # Derived hourly rate
 
         # Engineer Cost (Applies to ME, CE, Prog)
         eng_annual = eng_base + (eng_base * 0.11) + 23000
         eng_annual_inf = eng_annual * inf
-        c_eng_inf = eng_annual_inf / 2080 # Derived hourly rate for existing logic
+        c_eng_inf = eng_annual_inf / 2080 # Derived hourly rate
 
         # Other Costs
         c_bill_inf = bill_rate * inf
@@ -260,11 +291,22 @@ def run_fusion_model():
         techs_for_service = math.ceil(curr_labor_target / labor_capacity_per_tech)
 
         # B. Resources for S-Jobs
-        sj_labor_budget = curr_sjob_target * (sj_lab_pct / 100)
-        sj_tech_fte = (sj_labor_budget * w_tech) / (c_tech_inf * 2080)
-        sj_me_fte = (sj_labor_budget * w_me) / (c_eng_inf * 2080)
-        sj_ce_fte = (sj_labor_budget * w_ce) / (c_eng_inf * 2080)
-        sj_prog_fte = (sj_labor_budget * w_prog) / (c_eng_inf * 2080)
+        # New Logic: We use the Margin & Mix inputs to determine the Labor Budget
+        
+        # Total S-Job Revenue = curr_sjob_target
+        # Labor Revenue Portion = curr_sjob_target * (mix_lab_pct/100)
+        # Labor Cost Budget = Labor Revenue Portion * (1 - target_margin_lab/100)
+        
+        s_job_labor_revenue = curr_sjob_target * (mix_lab_pct/100)
+        s_job_labor_cost_budget = s_job_labor_revenue * (1 - (target_margin_lab/100))
+
+        # Now convert that COST budget into Headcount using the Weighted %
+        # (Assuming Labor Budget is spent on Internal Engineering Staff)
+        
+        sj_tech_fte = (s_job_labor_cost_budget * w_tech) / tech_annual_inf
+        sj_me_fte = (s_job_labor_cost_budget * w_me) / eng_annual_inf
+        sj_ce_fte = (s_job_labor_cost_budget * w_ce) / eng_annual_inf
+        sj_prog_fte = (s_job_labor_cost_budget * w_prog) / eng_annual_inf
 
         # C. Total Headcount Requirements
         req_techs = math.ceil(techs_for_service + sj_tech_fte)
@@ -297,16 +339,35 @@ def run_fusion_model():
         # 6. FINANCIALS (OPERATING)
 
         # COGS
+        # Service Labor
         cogs_labor_tech = cum_techs * 2080 * c_tech_inf
-        total_eng_fte = sj_me_fte + sj_ce_fte + sj_prog_fte
-        # CHARGEBACK LOGIC
-        cogs_chargeback_eng = total_eng_fte * 2080 * c_eng_inf
+        
+        # S-Job Labor Chargeback (The hours allocated to S-Jobs)
+        # Note: In this model, we hire staff to meet demand. 
+        # So "COGS Chargeback" is effectively the cost of the FTEs we dedicated to S-Jobs.
+        
+        # Since we calculate Total Payroll via Headcount, we don't need a separate chargeback line 
+        # unless we want to split COGS for reporting. 
+        # But for total P&L, Total Payroll covers it.
+        # However, to match the previous structure:
+        
+        # We will sum Total Payroll and put it in COGS for simplicity of this specific view
+        # Or split it. Let's stick to the previous robust way: 
+        # Total Tech Cost + Total Eng Cost = Total Labor COGS.
+        
+        total_eng_fte_actual = cum_me + cum_ce + cum_prog
+        cogs_eng_labor = total_eng_fte_actual * 2080 * c_eng_inf
+        
+        # Material COGS (S-Job)
+        # S-Job Material Rev = curr_sjob_target * (mix_mat_pct/100)
+        # S-Job Material Cost = Mat Rev * (1 - target_margin_mat/100)
+        s_job_mat_rev = curr_sjob_target * (mix_mat_pct/100)
+        cogs_sjob_mat = s_job_mat_rev * (1 - (target_margin_mat/100))
 
         cogs_job_parts = curr_job_parts_rev * (1 - (job_parts_margin/100))
         cogs_spares = curr_spares_target * (1 - (spares_margin/100))
-        cogs_sjob_mat = curr_sjob_target * (sj_mat_pct/100)
 
-        total_cogs = cogs_labor_tech + cogs_chargeback_eng + cogs_job_parts + cogs_spares + cogs_sjob_mat
+        total_cogs = cogs_labor_tech + cogs_eng_labor + cogs_job_parts + cogs_spares + cogs_sjob_mat
         gross_profit = total_rev - total_cogs
 
         # OpEx
@@ -362,7 +423,7 @@ def run_fusion_model():
             "Sales Reps": sales_reps,
             "Total Hires": total_hires,
             "OpEx: Hiring": opex_hire,
-            "Eng FTE": total_eng_fte,
+            "Eng FTE": total_eng_fte_actual, # Updated variable name
             "OpEx: Rent": opex_rent,
             "OpEx: Central": central_fee,
             "Total COGS": total_cogs,
