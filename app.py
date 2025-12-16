@@ -73,12 +73,20 @@ with st.sidebar:
     
     with st.expander("Talent Assumptions (Base Pay & Ramp)"):
         st.markdown("**Green Tech (Junior)**")
-        g_base = st.number_input("Green Base ($)", value=75000, help="Starting Base Salary.")
+        g_base = st.number_input(
+            "Green Base ($)", 
+            value=75000, 
+            help="Starting Base Salary. Assumes 12 Month Ramp (50% Efficiency in Year 1)."
+        )
         # RAMP: 12 Months (50% productivity in Year 1)
         g_ramp_yr1_factor = 0.50 
         
         st.markdown("**Rebadge Tech (Senior)**")
-        r_base = st.number_input("Rebadge Base ($)", value=130000, help="Starting Base Salary.")
+        r_base = st.number_input(
+            "Rebadge Base ($)", 
+            value=130000, 
+            help="Starting Base Salary. Assumes 1 Month Ramp (92% Efficiency in Year 1)."
+        )
         # RAMP: 1 Month (92% productivity in Year 1)
         r_ramp_yr1_factor = 0.92
         
@@ -107,11 +115,16 @@ with st.sidebar:
         
         w_rework_pct = (rework_rebadge * rebadge_ratio) + (rework_green * green_ratio)
         st.write(f"Weighted Rework Cost: **{w_rework_pct*100:.1f}% of Revenue**")
+        st.caption("Cost of mistakes, broken parts, and unbillable return trips.")
         
         st.markdown("---")
         st.markdown("#### 2. Salary Graduation")
         grad_year = 2028 # Year 3
-        grad_raise = st.number_input("Green Raise in Year 3 ($)", value=35000, help="Salary bump once Green techs become fully trained.")
+        grad_raise = st.number_input(
+            "Green Raise in Year 3 ($)", 
+            value=35000, 
+            help="In 2028 (Year 3), Green techs become Senior and demand a market rate raise."
+        )
         
         st.info(f"In {grad_year}, Green Base jumps to **${(g_base + grad_raise)/1000:.0f}k**")
 
@@ -126,8 +139,16 @@ with st.sidebar:
         act_rev_spares = st.number_input("2025 Spare Parts Rev", value=110000, step=10000, format="%d")
         
         st.markdown("---")
-        act_cogs = st.number_input("2025 Total COGS", value=1400000, step=10000, format="%d")
-        act_opex = st.number_input("2025 Total OpEx", value=425000, step=10000, format="%d")
+        act_cogs = st.number_input(
+            "2025 Total COGS", 
+            value=1400000, step=10000, format="%d",
+            help="Total Cost of Goods Sold (Labor + Material) from your 2025 P&L."
+        )
+        act_opex = st.number_input(
+            "2025 Total OpEx", 
+            value=425000, step=10000, format="%d",
+            help="Total Operating Expenses (Rent, Admin, Sales) from your 2025 P&L. This becomes your 'Base Overhead' for future years."
+        )
 
         # Calculate derived 2025 stats
         act_total_rev = act_rev_labor + act_rev_parts + act_rev_sjob + act_rev_spares
@@ -138,11 +159,23 @@ with st.sidebar:
 
     # --- REVENUE INPUTS ---
     st.header("2. Service Revenue")
-    tm_service_base = st.number_input("2026 Total Service Rev ($)", value=1500000, step=100000, format="%d")
-    tm_growth = st.number_input("Service Growth %", value=20, step=1, min_value=0, max_value=100)
+    tm_service_base = st.number_input(
+        "2026 Total Service Rev ($)", 
+        value=1500000, step=100000, format="%d",
+        help="Projected total revenue for T&M Service (Labor + Parts) for next year."
+    )
+    tm_growth = st.number_input(
+        "Service Growth %", 
+        value=20, step=1, min_value=0, max_value=100,
+        help="Annual organic growth rate for the Service business."
+    )
 
     st.subheader("Revenue Split")
-    labor_split_pct = st.number_input("Split: % from Labor", value=75, step=1, min_value=0, max_value=100)
+    labor_split_pct = st.number_input(
+        "Split: % from Labor", 
+        value=75, step=1, min_value=0, max_value=100,
+        help="Of the total Service Revenue, what % is billed labor? The rest is assumed to be Parts."
+    )
 
     disp_labor = tm_service_base * (labor_split_pct/100)
     disp_parts = tm_service_base * (1 - (labor_split_pct/100))
@@ -150,25 +183,46 @@ with st.sidebar:
 
     with st.expander("Service Settings"):
         bill_rate = st.number_input("Bill Rate ($/hr)", value=210, format="%d")
-        utilization_pct = st.number_input("Target Utilization %", value=80, step=1, min_value=10, max_value=100)
+        utilization_pct = st.number_input(
+            "Target Utilization %", 
+            value=80, step=1, min_value=10, max_value=100,
+            help="What % of a 2,080 hour year is billed? New Hires will be ramped against this target."
+        )
         utilization = utilization_pct / 100
-        job_parts_margin = st.number_input("Job Parts Margin %", value=30, step=1, min_value=0, max_value=100)
+        job_parts_margin = st.number_input(
+            "Job Parts Margin %", 
+            value=30, step=1, min_value=0, max_value=100,
+            help="Profit margin on parts sold during service calls."
+        )
 
     st.divider()
 
     st.header("3. S-Jobs (Projects)")
-    s_job_base = st.number_input("2026 S-Job Rev ($)", value=1000000, step=100000, format="%d")
+    s_job_base = st.number_input(
+        "2026 S-Job Rev ($)", 
+        value=1000000, step=100000, format="%d",
+        help="Projected total revenue for Projects/Integrations."
+    )
     s_job_growth = st.number_input("S-Job Growth %", value=15, step=1, min_value=0, max_value=100)
 
     with st.expander("S-Job Settings (Margin & Mix)"):
         st.caption("How do you quote a typical project?")
-        mix_mat_pct = st.slider("% Material (Hardware/Subs)", 0, 100, 50)
+        
+        mix_mat_pct = st.slider(
+            "% Material (Hardware/Subs)", 
+            0, 100, 50,
+            help="On a $100k project, how much is Hardware/Material? (vs Labor)"
+        )
         mix_lab_pct = 100 - mix_mat_pct
         st.caption(f"Mix: {mix_mat_pct}% Material / {mix_lab_pct}% Labor")
+        
         st.divider()
         st.markdown("**2. Target Margins**")
         target_margin_mat = st.slider("Margin on Material %", 0, 50, 20)
         target_margin_lab = st.slider("Margin on Labor %", 0, 80, 50)
+        
+        calc_mat_cost_pct = (mix_mat_pct/100) * (1 - target_margin_mat/100)
+        calc_lab_cost_pct = (mix_lab_pct/100) * (1 - target_margin_lab/100)
         
         st.markdown(f"""
         <div style='background-color:#eee; padding:5px; border-radius:5px; font-size:12px;'>
@@ -189,7 +243,11 @@ with st.sidebar:
     st.divider()
 
     st.header("4. Spare Parts (Direct)")
-    spares_base = st.number_input("2026 Spare Parts Rev ($)", value=150000, step=10000, format="%d")
+    spares_base = st.number_input(
+        "2026 Spare Parts Rev ($)", 
+        value=150000, step=10000, format="%d",
+        help="Revenue from direct part sales (customers calling in)."
+    )
     spares_growth = st.number_input("Spare Parts Growth %", value=10, step=1, min_value=0, max_value=100)
     spares_margin = st.number_input("Spare Parts Margin %", value=35, step=1, min_value=0, max_value=100)
 
@@ -208,24 +266,32 @@ with st.sidebar:
         eng_base = st.number_input("Engineer Base Salary ($)", value=120000, step=5000)
         eng_burd = eng_base + (eng_base * 0.11) + 23000
         
-        techs_per_loc_input = st.number_input("Max Techs per Location", value=4)
+        techs_per_loc_input = st.number_input(
+            "Max Techs per Location", 
+            value=4,
+            help="Trigger: If tech count exceeds this, we add a Location (Rent)."
+        )
 
         st.markdown("---")
         st.markdown("#### ⏳ Timing & Triggers (OpEx)")
-        rent_per_loc = st.number_input("Rent ($/mo)", value=5000, format="%d")
-        is_hq_free = st.checkbox("Is HQ Rent Free?", value=True)
-        central_cost = st.number_input("Corp Allocation (IT/HR) $/mo", value=8000, format="%d")
+        rent_per_loc = st.number_input("Rent ($/mo)", value=5000, format="%d", help="Monthly Rent per Location.")
+        is_hq_free = st.checkbox("Is HQ Rent Free?", value=True, help="If checked, you only pay rent for Loc 2, 3, etc.")
+        central_cost = st.number_input("Corp Allocation (IT/HR) $/mo", value=8000, format="%d", help="Shared services fee charged by HQ.")
         central_start_year = st.selectbox("Start Corp Allocation In:", [2026, 2027, 2028, 2029], index=1)
 
     st.markdown("---")
 
     st.caption("Hiring & Sales:")
-    attrition = st.number_input("Attrition %", value=10, step=1, min_value=0)
-    hire_cost = st.number_input("Hire Cost ($)", value=12000, format="%d")
-    sales_trigger = st.number_input("Rev per Sales Rep", value=3000000, format="%d")
+    attrition = st.number_input(
+        "Attrition %", 
+        value=10, step=1, min_value=0,
+        help="% of staff you lose and must pay to replace each year."
+    )
+    hire_cost = st.number_input("Hire Cost ($)", value=12000, format="%d", help="Recruiting/Headhunter fees per hire.")
+    sales_trigger = st.number_input("Rev per Sales Rep", value=3000000, format="%d", help="Trigger: Hire 1 Sales Rep for every $XM in revenue.")
     sales_rep_cost = 120000
 
-    inflation_pct = st.number_input("Inflation %", value=3.0, step=0.5)
+    inflation_pct = st.number_input("Inflation %", value=3.0, step=0.5, help="Annual cost increase for rent/salary.")
     inflation = inflation_pct / 100
 
     # --- RESTORED BELOW THE LINE ---
@@ -440,12 +506,18 @@ with c2:
     """, unsafe_allow_html=True)
 
 with c3:
+    # 3. RESTORED REVENUE CAPACITY CALLOUT
+    # Calc annual rev per tech
+    lab_cap = 2080 * utilization * bill_rate
+    ticket_cap = lab_cap / (labor_split_pct/100)
+    parts_cap = ticket_cap - lab_cap
+    
     st.markdown(f"""
     <div class='info-box'>
-    <h4>💡 Strategy Check</h4>
-    <span class='metric-label'>Tech Count in 2029</span><br>
-    <span class='metric-value'>{yr4['Techs']:.0f} Techs</span><br>
-    <span style='font-size:12px; color:#333;'>Locations: {yr4['Locations']:.0f} | Rebadge Mix: {mix_pct}%</span>
+    <h4>💡 Rev Capacity per Tech</h4>
+    <span class='metric-label'>Max Revenue (100% Util)</span><br>
+    <span class='metric-value'>${ticket_cap:,.0f}/yr</span><br>
+    <span style='font-size:12px; color:#333;'>(${lab_cap:,.0f} Labor + ${parts_cap:,.0f} Parts)</span>
     </div>
     """, unsafe_allow_html=True)
 
