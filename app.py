@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 
 # --- PAGE CONFIGURATION ---
-st.set_page_config(page_title="2029 Strategic Exit Model (Corrected)", layout="wide")
+st.set_page_config(page_title="2029 Strategic Exit Model (Ramp Logic)", layout="wide")
 
 st.markdown("""
 <style>
@@ -22,7 +22,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🚀 2029 Strategic Exit Model")
-st.markdown("The **Full Operational Model** (Matrix/S-Jobs) + **Talent Strategy** (Green vs. Rebadge).")
+st.markdown("The **Full Operational Model** (Matrix/S-Jobs) + **Ramp-Up Logic** (Green vs. Rebadge).")
 
 # ==========================================
 # 1. SIDEBAR: THE CONTROL TOWER
@@ -45,7 +45,7 @@ with st.sidebar:
         "EBITDA Multiple", 
         value=6.5, 
         step=0.5,
-        help="The multiplier a PE firm pays for your profit. Service firms usually trade at 4x-8x EBITDA. Higher growth/margins = Higher Multiple."
+        help="The multiplier a PE firm pays for your profit. Service firms usually trade at 4x-8x EBITDA."
     )
     
     # Calculate Required EBITDA
@@ -68,28 +68,38 @@ with st.sidebar:
     mix_pct = st.slider(
         "Hiring Mix (% Rebadge)", 
         0, 100, 50, 
-        help="0% = Hiring all Junior 'Green' Techs. 100% = Hiring all Senior 'Rebadge' Techs. Higher Rebadge % increases Utilization."
+        help="0% = Hiring all Junior 'Green' Techs. 100% = Hiring all Senior 'Rebadge' Techs."
     )
     
-    with st.expander("Talent Assumptions (Base Pay)"):
+    with st.expander("Talent Assumptions (Ramp & Cost)", expanded=True):
         st.markdown("**Green Tech (Junior)**")
         g_base = st.number_input("Green Base ($)", value=75000)
+        # RAMP LOGIC: 12 Months to full speed. 
+        # In Year 1, they average ~50% productivity.
+        g_ramp_yr1_factor = 0.50 
         
         st.markdown("**Rebadge Tech (Senior)**")
         r_base = st.number_input("Rebadge Base ($)", value=130000)
+        # RAMP LOGIC: 1 Month to full speed.
+        # In Year 1, they average ~92% productivity.
+        r_ramp_yr1_factor = 0.92
         
         # Burden Calc
         def calc_burden(base): return base + (base * 0.11) + 23000
         g_cost = calc_burden(g_base)
         r_cost = calc_burden(r_base)
         
-        # Weighted Average Cost per Head
+        # Weighted Averages
         rebadge_ratio = mix_pct / 100
         green_ratio = 1 - rebadge_ratio
         
         w_cost_tech = (g_cost * green_ratio) + (r_cost * rebadge_ratio)
         
-        st.info(f"**Blended Tech Cost:** ${w_cost_tech:,.0f}/yr\n\n(Includes 11% Tax + $23k Insurance)")
+        # WEIGHTED RAMP FACTOR (Crucial for Year 1 Hires)
+        w_ramp_factor = (g_ramp_yr1_factor * green_ratio) + (r_ramp_yr1_factor * rebadge_ratio)
+        
+        st.info(f"**Blended Tech Cost:** ${w_cost_tech:,.0f}/yr")
+        st.warning(f"**New Hire Efficiency:** {w_ramp_factor*100:.0f}%\n(Avg productivity in Year 1)")
 
     st.divider()
 
@@ -136,26 +146,14 @@ with st.sidebar:
     disp_parts = tm_service_base * (1 - (labor_split_pct/100))
     st.markdown(f"<div class='split-box'><b>2026 Breakdown:</b><br>🛠️ Labor: <b>${disp_labor:,.0f}</b><br>⚙️ Job Parts: <b>${disp_parts:,.0f}</b></div>", unsafe_allow_html=True)
 
-    # --- UPDATED UTILIZATION LOGIC ---
-    with st.expander("Service Settings (Efficiency)", expanded=True):
-        st.markdown("#### ⚡ Dynamic Utilization")
-        st.caption("Efficiency scales with your Talent Mix.")
-        
-        # Hard limits for efficiency
-        max_util_rebadge = 0.85 # Rebadges are highly efficient
-        max_util_green = 0.65   # Green techs are less efficient
-        
-        # Weighted Average Utilization
-        calc_utilization = (max_util_rebadge * rebadge_ratio) + (max_util_green * green_ratio)
-        
-        st.markdown(f"""
-        <div style='background-color:#fff3e0; padding:10px; border-radius:5px;'>
-        <b>Effectve Utilization: {calc_utilization*100:.1f}%</b><br>
-        <small>({max_util_rebadge*100:.0f}% Rebadge vs {max_util_green*100:.0f}% Green)</small>
-        </div>
-        """, unsafe_allow_html=True)
-        
+    with st.expander("Service Settings"):
         bill_rate = st.number_input("Bill Rate ($/hr)", value=210, format="%d")
+        utilization_pct = st.number_input(
+            "Target Utilization %", 
+            value=80, step=1, min_value=10, max_value=100,
+            help="Steady State Utilization for a fully trained tech. New Hires will be discounted against this."
+        )
+        utilization = utilization_pct / 100
         job_parts_margin = st.number_input("Job Parts Margin %", value=30, step=1, min_value=0, max_value=100, help="Profit margin on parts sold during service calls.")
 
     st.divider()
@@ -384,13 +382,31 @@ def run_fusion_model():
         # Total Top Line
         total_rev = curr_labor_target + curr_job_parts_rev + curr_sjob_target + curr_spares_target
 
-        # 3. RESOURCE LOADING
-        # A. Techs for Service Labor
-        # USE THE DYNAMIC UTILIZATION
-        labor_capacity_per_tech = 2080 * calc_utilization * c_bill_inf
-        techs_for_service = math.ceil(curr_labor_target / labor_capacity_per_tech)
-
-        # B. Resources for S-Jobs
+        # 3. RESOURCE LOADING (HEADCOUNT SOLVER)
+        
+        # --- A. Service Techs ---
+        # Logic: 
+        # Total Service Capacity Needed = Labor Revenue Target
+        # Existing Capacity = cum_techs * Full Capacity
+        # New Tech Capacity = New Hire * (Full Capacity * RAMP_FACTOR)
+        # Solve for New Hires.
+        
+        full_capacity_per_tech = 2080 * utilization * c_bill_inf
+        
+        # Revenue we can handle with current staff (Assuming they are fully ramped by now)
+        existing_capacity_rev = cum_techs * full_capacity_per_tech
+        
+        # Revenue Gap to be filled by New Hires
+        gap_revenue = max(0, curr_labor_target - existing_capacity_rev)
+        
+        # Capacity of a NEW hire in Year 1 (Discounted by Ramp Factor)
+        new_hire_yr1_capacity = full_capacity_per_tech * w_ramp_factor
+        
+        # Techs needed to fill gap
+        needed_new_techs_service = math.ceil(gap_revenue / new_hire_yr1_capacity)
+        
+        # --- B. Resources for S-Jobs ---
+        # Standard S-Job loading logic (Budget -> Headcount)
         s_job_labor_revenue = curr_sjob_target * (mix_lab_pct/100)
         s_job_labor_cost_budget = s_job_labor_revenue * (1 - (target_margin_lab/100))
 
@@ -399,15 +415,39 @@ def run_fusion_model():
         sj_ce_fte = (s_job_labor_cost_budget * w_ce) / eng_annual_inf
         sj_prog_fte = (s_job_labor_cost_budget * w_prog) / eng_annual_inf
 
-        # C. Total Headcount Requirements
-        req_techs = math.ceil(techs_for_service + sj_tech_fte)
+        # C. Total Headcount Update
+        # Total Techs = Previous + New Service Hires + S-Job Techs
+        # Note: We treat S-Job techs as separate FTE addition for simplicity here, 
+        # or assume they come from the Service Pool. 
+        # Standard Matrix: S-Job techs are pulled from Service Pool.
+        # So total techs must cover Service Demand + S-Job Demand.
+        
+        # Let's sum the FTE requirements
+        total_techs_required = cum_techs + needed_new_techs_service + sj_tech_fte
+        
+        # But wait, cum_techs is just the count. We need to actually increment it.
+        # The logic: We start with `cum_techs`. We added `needed_new_techs_service` to cover Service Gap.
+        # Plus we need `sj_tech_fte` for projects.
+        # So target headcount is:
+        # (cum_techs + needed_new_techs_service) is the service workforce.
+        # + sj_tech_fte is the project workforce.
+        
+        # Actually, simpler:
+        # Total Labor Demand = Service Rev + S-Job Tech Budget
+        # But we handled Service Gap logic explicitly above.
+        
+        final_tech_count = cum_techs + needed_new_techs_service + math.ceil(sj_tech_fte)
+        
+        # 4. HIRING & ATTRITION
+        # Net new heads
+        net_new_techs = final_tech_count - cum_techs
+        cum_techs = final_tech_count
+        
+        # Eng Heads
         req_me = math.ceil(sj_me_fte)
         req_ce = math.ceil(sj_ce_fte)
         req_prog = math.ceil(sj_prog_fte)
-
-        # 4. HIRING & ATTRITION
-        new_techs = max(0, req_techs - cum_techs)
-        cum_techs = max(cum_techs, req_techs)
+        
         new_me = max(0, req_me - cum_me)
         cum_me = max(cum_me, req_me)
         new_ce = max(0, req_ce - cum_ce)
@@ -415,7 +455,7 @@ def run_fusion_model():
         new_prog = max(0, req_prog - cum_prog)
         cum_prog = max(cum_prog, req_prog)
 
-        growth_hires = new_techs + new_me + new_ce + new_prog
+        growth_hires = net_new_techs + new_me + new_ce + new_prog
         attrition_count = math.ceil(prev_total_hc * (attrition/100))
         total_hires = growth_hires + attrition_count
 
@@ -444,7 +484,7 @@ def run_fusion_model():
         gross_profit = total_rev - total_cogs
 
         # OpEx
-        # -- FIX --: Inflate Base + Add New Variables.
+        # Inflate Base + Add New Variables.
         base_overhead_curr = base_overhead_start * inf
         
         if is_hq_free:
@@ -553,7 +593,8 @@ with c2:
     """, unsafe_allow_html=True)
 
 with c3:
-    lab_cap = 2080 * calc_utilization * bill_rate
+    # Recalculate caps for display based on steady state
+    lab_cap = 2080 * utilization * bill_rate
     ticket_cap = lab_cap / (labor_split_pct/100)
     
     st.markdown(f"""
