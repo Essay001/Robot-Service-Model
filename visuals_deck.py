@@ -40,7 +40,9 @@ s_job_base = 750000
 s_job_growth = 10
 s_job_hire_trigger = 1200000
 mix_mat_pct = 60
-mix_lab_pct = 100 - mix_mat_pct  # <--- FIXED: Added this calculation
+# --- FIX IS HERE: Defining the missing variable ---
+mix_lab_pct = 100 - mix_mat_pct 
+# --------------------------------------------------
 target_margin_mat = 35
 target_margin_lab = 50
 w_tech = 0.0
