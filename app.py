@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 
 # --- PAGE CONFIGURATION ---
-st.set_page_config(page_title="2029 Strategic Exit Model (Transparency)", layout="wide")
+st.set_page_config(page_title="2029 Strategic Exit Model (Final)", layout="wide")
 
 st.markdown("""
 <style>
@@ -293,7 +293,7 @@ with st.sidebar:
     inflation_pct = st.number_input("Inflation %", value=3.0, step=0.5, help="Annual cost increase for rent/salary.")
     inflation = inflation_pct / 100
 
-    # --- RESTORED BELOW THE LINE ---
+    # --- BELOW THE LINE ---
     st.header("6. Below the Line (Estimates)")
     st.caption("Deductions from EBITDA to get Net Income.")
     depreciation_pct = st.number_input("Depreciation (% of Rev)", value=1.5, step=0.5)
@@ -324,7 +324,6 @@ def run_fusion_model():
         "Net Income": act_ebitda * (1 - (tax_rate/100)),
         "Net Margin %": (act_ebitda * (1 - (tax_rate/100))) / act_total_rev if act_total_rev else 0,
         "D&A": 0, "Interest": 0, "Taxes": 0, "Rework": 0,
-        # Placeholders for 2025 Breakdown
         "OpEx: Base": act_opex, "OpEx: Managers": 0, "OpEx: Sales": 0, "OpEx: Rework": 0
     }
 
@@ -342,7 +341,7 @@ def run_fusion_model():
     for i, year in enumerate(years):
         inf = (1 + inflation) ** (i + 1)
 
-        # --- DYNAMIC TECH COST (GRADUATION LOGIC) ---
+        # Cost Updates
         current_g_base = g_base
         if year >= grad_year:
             current_g_base += grad_raise
@@ -372,7 +371,7 @@ def run_fusion_model():
         curr_job_parts_rev = curr_service_target * (1 - (labor_split_pct / 100))
         total_rev = curr_labor_target + curr_job_parts_rev + curr_sjob_target + curr_spares_target
 
-        # 3. RESOURCE LOADING (WITH RESTORED SPLIT LOGIC)
+        # 3. RESOURCE LOADING
         # Service Techs
         full_capacity_per_tech = 2080 * utilization * c_bill_inf
         existing_capacity_rev = cum_techs * full_capacity_per_tech
@@ -380,7 +379,7 @@ def run_fusion_model():
         new_hire_yr1_capacity = full_capacity_per_tech * w_ramp_factor
         needed_new_techs_service = math.ceil(gap_revenue / new_hire_yr1_capacity)
         
-        # S-Jobs (Using Restored w_tech, w_me, etc.)
+        # S-Jobs
         s_job_labor_revenue = curr_sjob_target * (mix_lab_pct/100)
         s_job_labor_cost_budget = s_job_labor_revenue * (1 - (target_margin_lab/100))
         
@@ -407,7 +406,12 @@ def run_fusion_model():
 
         # 5. OPS
         locs = math.ceil(cum_techs / techs_per_loc_input) 
-        managers = math.ceil(cum_techs / 10)
+        
+        # -- FIX FOR MANAGERS (First one free) --
+        managers_total = math.ceil(cum_techs / 10)
+        # We assume 1st manager is covered in Base OpEx ($425k)
+        managers_incremental = max(0, managers_total - 1)
+        
         sales_reps = math.floor(total_rev / sales_trigger)
 
         # 6. FINANCIALS
@@ -427,7 +431,10 @@ def run_fusion_model():
         billable_locs = max(0, locs - 1) if is_hq_free else locs
         opex_rent = billable_locs * c_rent_inf * 12
         central_fee = central_cost * 12 * inf if (year >= central_start_year and locs > 1) else 0
-        opex_mgr = managers * (85000 * 1.2 * inf)
+        
+        # Only paying for Incremental Managers now
+        opex_mgr = managers_incremental * (85000 * 1.2 * inf)
+        
         opex_sales = sales_reps * (sales_rep_cost * inf)
         opex_hire = total_hires * c_hire_inf
         opex_rework = total_rev * w_rework_pct
@@ -512,17 +519,16 @@ with c2:
     """, unsafe_allow_html=True)
 
 with c3:
-    # 3. RESTORED REVENUE CAPACITY CALLOUT
     lab_cap = 2080 * utilization * bill_rate
     ticket_cap = lab_cap / (labor_split_pct/100)
     parts_cap = ticket_cap - lab_cap
     
     st.markdown(f"""
     <div class='info-box'>
-    <h4>💡 Rev Capacity per Tech</h4>
-    <span class='metric-label'>Max Revenue (100% Util)</span><br>
-    <span class='metric-value'>${ticket_cap:,.0f}/yr</span><br>
-    <span style='font-size:12px; color:#333;'>(${lab_cap:,.0f} Labor + ${parts_cap:,.0f} Parts)</span>
+    <h4>💡 Strategy Check</h4>
+    <span class='metric-label'>2029 Headcount</span><br>
+    <span class='metric-value'>{yr4['Techs']:.0f} Techs</span><br>
+    <span style='font-size:12px; color:#333;'>Rev Capacity per Tech: ${ticket_cap:,.0f}</span>
     </div>
     """, unsafe_allow_html=True)
 
@@ -574,8 +580,8 @@ def format_df(d, m): return d.style.format(m)
 
 with tab1:
     st.markdown("### P&L Statement (The Waterfall)")
-    cols_pl = ['Year', 'Total Revenue', 'Total COGS', 'Gross Profit', 'Total OpEx', 'EBITDA', 'EBITDA Margin %', 'Net Income']
-    fmt = {'Year': '{:.0f}', 'EBITDA Margin %': '{:.1%}', 'Net Margin %': '{:.1%}'}
+    cols_pl = ['Year', 'Total Revenue', 'Total COGS', 'Gross Profit', 'Gross Margin %', 'Total OpEx', 'EBITDA', 'EBITDA Margin %', 'Net Income', 'Net Margin %']
+    fmt = {'Year': '{:.0f}', 'Gross Margin %': '{:.1%}', 'EBITDA Margin %': '{:.1%}', 'Net Margin %': '{:.1%}'}
     for c in cols_pl:
         if c not in fmt: fmt[c] = "${:,.0f}"
     st.dataframe(format_df(df[cols_pl], fmt), use_container_width=True)
@@ -598,6 +604,6 @@ with tab3:
     <div class='audit-box'>
     <b>Rent Rule:</b> HQ Free = {is_hq_free}. You pay for Locs-1.<br>
     <b>Central Rule:</b> Starts in {central_start_year} AND requires > 1 Location.
-    <b>Manager Rule:</b> 1 Manager per 10 Techs (Minimum 1).
+    <b>Manager Rule:</b> 1 Manager per 10 Techs (First one is Free/Base).
     </div>
     """, unsafe_allow_html=True)
