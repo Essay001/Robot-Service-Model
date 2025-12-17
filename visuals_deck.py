@@ -1,150 +1,273 @@
-import streamlit as st
 import pandas as pd
 import numpy as np
+import math
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 
-st.set_page_config(page_title="Executive Visuals Deck", layout="wide")
+# ==========================================
+# 1. HARDCODED SETTINGS (From Your Export)
+# ==========================================
 
-st.title("📸 Presentation Visuals Generator")
-st.markdown("Use the **sidebar sliders** to adjust the chart size for your PowerPoint slides.")
+# 1. EXIT GOAL
+exit_target_val = 3750000
+valuation_multiple = 7.0
+
+# 2. TALENT
+mix_pct = 50
+g_base = 75000
+r_base = 130000
+
+# 3. 2025 BASELINE
+act_rev_labor = 900000
+act_rev_parts = 425000
+act_rev_sjob = 750000
+act_rev_spares = 110000
+act_cogs = 1400000
+act_opex = 425000
+act_total_rev = act_rev_labor + act_rev_parts + act_rev_sjob + act_rev_spares
+act_ebitda = act_total_rev - act_cogs - act_opex
+
+# 4. SERVICE REVENUE
+tm_service_base = 1750000
+tm_growth = 20
+labor_split_pct = 75
+bill_rate = 210
+utilization_pct = 75
+job_parts_margin = 30
+
+# 5. S-JOBS
+s_job_base = 750000
+s_job_growth = 10
+s_job_hire_trigger = 1200000
+mix_mat_pct = 60
+target_margin_mat = 35
+target_margin_lab = 50
+w_tech = 0.0
+w_me = 0.30
+w_ce = 0.20
+w_prog = 0.50
+
+# 6. SPARES
+spares_base = 150000
+spares_growth = 10
+spares_margin = 35
+
+# 7. OPS & COSTS
+base_techs = 2
+base_me = 1
+base_ce = 1
+base_prog = 1
+techs_per_loc_input = 4
+rent_per_loc = 0
+central_cost = 0
+central_start_year = 2027
+sales_trigger = 5000000
+inflation_pct = 3.0
+hire_cost = 12000
+sales_rep_cost = 120000
+eng_base = 120000
+
+# Derived & Constants
+rebadge_ratio = mix_pct / 100
+green_ratio = 1 - rebadge_ratio
+g_ramp_yr1_factor = 0.50
+r_ramp_yr1_factor = 0.92
+w_ramp_factor = (g_ramp_yr1_factor * green_ratio) + (r_ramp_yr1_factor * rebadge_ratio)
+grad_year = 2028
+grad_raise = 35000
+utilization = utilization_pct / 100
+inflation = inflation_pct / 100
+attrition = 10
+rework_rebadge = 0.01 
+rework_green = 0.05   
+w_rework_pct = (rework_rebadge * rebadge_ratio) + (rework_green * green_ratio)
+depreciation_pct = 1.5
+interest_expense = 0
+tax_rate = 25
+
+def calc_burden(base): return base + (base * 0.11) + 23000
 
 # ==========================================
-# SIDEBAR CONTROLS
+# 2. LOGIC ENGINE (Replicating app.py)
 # ==========================================
-with st.sidebar:
-    st.header("🖼️ Chart Dimensions")
-    c_width = st.slider("Chart Width (Inches)", 4, 15, 6) 
-    c_height = st.slider("Chart Height (Inches)", 3, 10, 4)
 
-# ==========================================
-# CHART 1: REVENUE BRIDGE (WATERFALL)
-# ==========================================
-st.header("Slide 1: The 'Revenue Bridge' (Waterfall)")
-st.caption("Explaining how we get from FY25 to the FY26 Target (Strict Math).")
+def run_fusion_model():
+    row_2025 = {
+        "Year": 2025,
+        "Total Revenue": act_total_rev,
+        "Rev: Labor": act_rev_labor,
+        "Rev: Job Parts": act_rev_parts,
+        "Rev: S-Jobs": act_rev_sjob,
+        "Rev: Spare Parts": act_rev_spares,
+        "EBITDA Margin %": act_ebitda/act_total_rev if act_total_rev else 0
+    }
 
-wf_data = {
-    'Category': ['FY25 Baseline', '+ Rebadge Labor', '+ Organic Parts', '+ Tech Parts (Attached)', '+ S-Job Growth', 'FY26 Target'],
-    'Value': [1.5, 0.672, 0.030, 0.100, 0.200, 0.0], 
-    'Type': ['Base', 'Add', 'Add', 'Add', 'Add', 'Total']
-}
-df_wf = pd.DataFrame(wf_data)
-df_wf['cumsum'] = df_wf['Value'].cumsum()
-df_wf.loc[df_wf.index[-1], 'Value'] = df_wf.loc[df_wf.index[-2], 'cumsum']
-df_wf.loc[df_wf.index[-1], 'cumsum'] = df_wf.loc[df_wf.index[-1], 'Value']
-
-fig1, ax1 = plt.subplots(figsize=(c_width, c_height))
-bottom = 0
-for i, row in df_wf.iterrows():
-    color = '#2196f3' if row['Type'] in ['Base', 'Total'] else '#4caf50'
-    ax1.bar(row['Category'], row['Value'], bottom=bottom if row['Type'] != 'Base' and row['Type'] != 'Total' else 0, color=color, edgecolor='black')
-    if row['Type'] != 'Base' and row['Type'] != 'Total': bottom += row['Value']
-
-ax1.set_ylabel('Revenue ($ Millions)')
-ax1.set_title('FY26 Revenue Bridge: Building the Target')
-ax1.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:.2f}M'))
-plt.xticks(rotation=45, ha='right') 
-ax1.grid(axis='y', linestyle='--', alpha=0.5)
-st.pyplot(fig1)
-
-st.divider()
-
-# ==========================================
-# CHART 2: THE CASH FLOW J-CURVE (UPDATED)
-# ==========================================
-st.header("Slide 2: The 'Training Trap' (J-Curve)")
-st.caption("Cumulative Cash Flow: Updated with 12-Month Ramp & Full Burden.")
-
-months = list(range(1, 13))
-
-# --- GREEN TECH ASSUMPTIONS ---
-# Base: $75k
-# Burden: (75000 * 0.11) + 23000 = $31,250
-# Total Cost: $106,250/yr -> $8,854/mo
-green_monthly_cost = 8854
-# Revenue: Ramps to $28,000/mo ($336k/yr) over 12 months
-green_rev = []
-for m in months:
-    ramp = m / 12 # Linear ramp over 12 months
-    green_rev.append(28000 * ramp)
+    years = [2026, 2027, 2028, 2029]
+    data = [row_2025]
     
-green_cash = np.array(green_rev) - green_monthly_cost
-green_cum = np.cumsum(green_cash)
+    base_overhead_start = act_opex
+    curr_service_target = tm_service_base
+    curr_sjob_target = s_job_base
+    curr_spares_target = spares_base
+    cum_techs = base_techs
+    cum_me = base_me; cum_ce = base_ce; cum_prog = base_prog
+    prev_total_hc = base_techs + base_me + base_ce + base_prog
 
-# --- REBADGE TECH ASSUMPTIONS ---
-# Base: $130k
-# Burden: (130000 * 0.11) + 23000 = $37,300
-# Total Cost: $167,300/yr -> $13,942/mo
-reb_monthly_cost = 13942
-# Revenue: $28,000 labor + approx $9,500 value add (parts/efficiency) = $37,500/mo
-reb_rev = [37500] * 12 
-reb_cash = np.array(reb_rev) - reb_monthly_cost
-reb_cum = np.cumsum(reb_cash)
+    for i, year in enumerate(years):
+        inf = (1 + inflation) ** (i + 1)
 
-# --- PLOTTING ---
-fig2, ax2 = plt.subplots(figsize=(c_width, c_height))
+        # Cost Updates
+        current_g_base = g_base
+        if year >= grad_year:
+            current_g_base += grad_raise
+            
+        g_cost_curr = calc_burden(current_g_base)
+        r_cost_curr = calc_burden(r_base)
+        
+        w_cost_tech_annual = (g_cost_curr * green_ratio) + (r_cost_curr * rebadge_ratio)
+        tech_annual_inf = w_cost_tech_annual * inf
+        c_tech_inf = tech_annual_inf / 2080 
 
-ax2.plot(months, green_cum, label='Green Tech ($75k Base + 12 Mo Ramp)', color='#f44336', linewidth=3, linestyle='--')
-ax2.plot(months, reb_cum, label='Rebadge Tech ($130k Base + Instant)', color='#4caf50', linewidth=4)
-ax2.axhline(0, color='black', linewidth=1)
+        eng_annual = eng_base + (eng_base * 0.11) + 23000
+        eng_annual_inf = eng_annual * inf
+        c_eng_inf = eng_annual_inf / 2080
 
-# Dynamic Annotation for Green Tech Hole
-min_val = min(green_cum)
-min_idx = list(green_cum).index(min_val)
-ax2.annotate('Deep Cash Hole', xy=(min_idx+1, min_val), xytext=(min_idx+1, min_val - 40000),
-             arrowprops=dict(facecolor='red', shrink=0.05), color='red', ha='center', fontsize=9, fontweight='bold')
+        c_bill_inf = bill_rate * inf
+        c_hire_inf = hire_cost * inf
+        c_rent_inf = rent_per_loc * inf
 
-ax2.set_ylabel('Cumulative Cash Generated ($)')
-ax2.set_xlabel('Months in FY26')
-ax2.set_title('Cumulative Cash Flow Impact (Per Hire)')
-ax2.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
-ax2.legend()
-ax2.grid(True, alpha=0.3)
-st.pyplot(fig2)
+        # 2. REVENUE
+        if i > 0:
+            curr_service_target = curr_service_target * (1 + tm_growth/100)
+            curr_sjob_target = curr_sjob_target * (1 + s_job_growth/100)
+            curr_spares_target = curr_spares_target * (1 + spares_growth/100)
 
-st.divider()
+        curr_labor_target = curr_service_target * (labor_split_pct / 100)
+        curr_job_parts_rev = curr_service_target * (1 - (labor_split_pct / 100))
+        total_rev = curr_labor_target + curr_job_parts_rev + curr_sjob_target + curr_spares_target
+
+        # 3. RESOURCE LOADING
+        full_capacity_per_tech = 2080 * utilization * c_bill_inf
+        existing_capacity_rev = cum_techs * full_capacity_per_tech
+        gap_revenue = max(0, curr_labor_target - existing_capacity_rev)
+        new_hire_yr1_capacity = full_capacity_per_tech * w_ramp_factor
+        needed_new_techs_service = math.ceil(gap_revenue / new_hire_yr1_capacity)
+        
+        s_job_labor_revenue = curr_sjob_target * (mix_lab_pct/100)
+        s_job_labor_cost_budget = s_job_labor_revenue * (1 - (target_margin_lab/100))
+        
+        sj_tech_fte = (s_job_labor_cost_budget * (w_tech/100)) / tech_annual_inf
+        sj_me_fte = (s_job_labor_cost_budget * (w_me/100)) / eng_annual_inf
+        sj_ce_fte = (s_job_labor_cost_budget * (w_ce/100)) / eng_annual_inf
+        sj_prog_fte = (s_job_labor_cost_budget * (w_prog/100)) / eng_annual_inf
+
+        # 4. HIRING & CONTRACTING LOGIC
+        use_contractors = curr_sjob_target < s_job_hire_trigger
+        
+        cogs_sjob_contractor = 0
+        req_me = 0; req_ce = 0; req_prog = 0
+        
+        if use_contractors:
+            req_me = base_me
+            req_ce = base_ce
+            req_prog = base_prog
+            eng_portion_share = (w_me + w_ce + w_prog)/100
+            cogs_sjob_contractor = s_job_labor_cost_budget * eng_portion_share
+        else:
+            total_eng_fte_demand = sj_me_fte + sj_ce_fte + sj_prog_fte
+            total_eng_bodies_needed = math.ceil(total_eng_fte_demand)
+            existing_eng_pool = cum_me + cum_ce + cum_prog
+            net_new_eng = max(0, total_eng_bodies_needed - existing_eng_pool)
+            req_me = cum_me + net_new_eng
+            req_ce = cum_ce 
+            req_prog = cum_prog
+            cogs_sjob_contractor = 0
+
+        final_tech_count = cum_techs + needed_new_techs_service + math.ceil(sj_tech_fte)
+        net_new_techs = final_tech_count - cum_techs
+        cum_techs = final_tech_count
+        
+        new_me = max(0, req_me - cum_me); cum_me = max(cum_me, req_me)
+        new_ce = max(0, req_ce - cum_ce); cum_ce = max(cum_ce, req_ce)
+        new_prog = max(0, req_prog - cum_prog); cum_prog = max(cum_prog, req_prog)
+
+        growth_hires = net_new_techs + new_me + new_ce + new_prog
+        attrition_count = math.ceil(prev_total_hc * (attrition/100))
+        total_hires = growth_hires + attrition_count
+        prev_total_hc = cum_techs + cum_me + cum_ce + cum_prog
+
+        locs = math.ceil(cum_techs / techs_per_loc_input) 
+        managers_total = math.ceil(cum_techs / 10)
+        managers_incremental = max(0, managers_total - 1)
+        sales_reps = math.floor(total_rev / sales_trigger)
+
+        # 6. FINANCIALS
+        cogs_labor_tech = cum_techs * 2080 * c_tech_inf
+        total_eng_fte_actual = cum_me + cum_ce + cum_prog
+        cogs_eng_labor = total_eng_fte_actual * 2080 * c_eng_inf
+        s_job_mat_rev = curr_sjob_target * (mix_mat_pct/100)
+        cogs_sjob_mat = s_job_mat_rev * (1 - (target_margin_mat/100))
+        cogs_job_parts = curr_job_parts_rev * (1 - (job_parts_margin/100))
+        cogs_spares = curr_spares_target * (1 - (spares_margin/100))
+
+        total_cogs = cogs_labor_tech + cogs_eng_labor + cogs_job_parts + cogs_spares + cogs_sjob_mat + cogs_sjob_contractor
+        gross_profit = total_rev - total_cogs
+
+        base_overhead_curr = base_overhead_start * inf
+        billable_locs = max(0, locs - 1) 
+        opex_rent = billable_locs * c_rent_inf * 12
+        central_fee = central_cost * 12 * inf if (year >= central_start_year and locs > 1) else 0
+        opex_mgr = managers_incremental * (85000 * 1.2 * inf)
+        opex_sales = sales_reps * (sales_rep_cost * inf)
+        opex_hire = total_hires * c_hire_inf
+        opex_rework = total_rev * w_rework_pct
+
+        total_opex = base_overhead_curr + opex_rent + opex_hire + central_fee + opex_sales + opex_rework + opex_mgr
+        ebitda = gross_profit - total_opex
+
+        data.append({
+            "Year": year,
+            "Total Revenue": total_rev,
+            "Rev: Labor": curr_labor_target,
+            "Rev: Job Parts": curr_job_parts_rev,
+            "Rev: S-Jobs": curr_sjob_target,
+            "Rev: Spare Parts": curr_spares_target,
+            "EBITDA Margin %": ebitda/total_rev,
+        })
+
+    return pd.DataFrame(data)
+
+df = run_fusion_model()
 
 # ==========================================
-# CHART 3: THE CSP MARGIN STEP
+# 3. GENERATE CHART
 # ==========================================
-st.header("Slide 3: The Margin Step-Up")
-st.caption("Visualizing the instant impact of CSP Status on Parts Profitability.")
 
-fig3, ax3 = plt.subplots(figsize=(c_width, c_height))
-margin_months = list(range(1, 13))
-margin_vals = [10 if m < 6 else 25 for m in margin_months] 
-ax3.step(margin_months, margin_vals, where='post', linewidth=4, color='#9c27b0')
-ax3.fill_between(margin_months, margin_vals, step="post", alpha=0.2, color='#9c27b0')
-ax3.set_ylim(0, 35)
-ax3.set_ylabel('Parts Gross Margin %')
-ax3.set_xlabel('FY26 Month')
-ax3.set_title('Impact of Fanuc CSP Certification')
-ax3.yaxis.set_major_formatter(mtick.PercentFormatter(100))
-ax3.annotate('CSP Activation\n(Profit +150%)', xy=(6, 25), xytext=(3, 30),
-             arrowprops=dict(facecolor='black', shrink=0.05), fontsize=10, fontweight='bold')
-st.pyplot(fig3)
+fig, ax = plt.subplots(figsize=(10, 5))
 
-st.divider()
+years = df['Year']
+p1 = ax.bar(years, df['Rev: Labor'], label='Service Labor', color='#1565c0')
+p2 = ax.bar(years, df['Rev: Job Parts'], bottom=df['Rev: Labor'], label='Job Parts', color='#64b5f6')
+p3 = ax.bar(years, df['Rev: S-Jobs'], bottom=df['Rev: Labor']+df['Rev: Job Parts'], label='S-Jobs', color='#ffb74d')
+p4 = ax.bar(years, df['Rev: Spare Parts'], bottom=df['Rev: Labor']+df['Rev: Job Parts']+df['Rev: S-Jobs'], label='Spare Parts', color='#81c784')
 
-# ==========================================
-# CHART 4: REVENUE MOMENTUM (STACKED AREA)
-# ==========================================
-st.header("Slide 4: FY26 Momentum (Stacked Area)")
-st.caption("Quarterly Revenue Run-Rate by Source.")
+for container in ax.containers:
+    labels = [f'${v/1000000:.1f}M' if v > 100000 else "" for v in container.datavalues]
+    ax.bar_label(container, labels=labels, label_type='center', color='white', fontsize=9, padding=0)
 
-quarters = ['Q1', 'Q2', 'Q3', 'Q4']
-base = [350000, 355000, 360000, 365000] 
-parts = [30000, 35000, 55000, 60000] 
-labor = [110000, 115000, 220000, 230000] 
-sjobs = [40000, 50000, 70000, 90000] 
+ax2 = ax.twinx()
+ax2.plot(years, df['EBITDA Margin %'] * 100, color='#212121', linestyle='-', linewidth=3, marker='o', label='EBITDA Margin')
+ax2.set_ylabel('EBITDA Margin (%)', color='#212121')
 
-fig4, ax4 = plt.subplots(figsize=(c_width, c_height))
-ax4.stackplot(quarters, base, parts, labor, sjobs, 
-              labels=['Base Break/Fix', 'Spare Parts (CSP)', 'Rebadge Labor', 'S-Projects'],
-              colors=['#bdbdbd', '#e1bee7', '#ff9800', '#2196f3'], alpha=0.8)
-ax4.set_ylabel('Quarterly Revenue ($)')
-ax4.set_title('FY26 Revenue Composition & Growth')
-ax4.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
-ax4.legend(loc='upper left', fontsize='small')
-ax4.grid(axis='y', linestyle='--', alpha=0.3)
-st.pyplot(fig4)
+lines, labels = ax.get_legend_handles_labels()
+lines2, labels2 = ax2.get_legend_handles_labels()
+ax.legend(lines + lines2, labels + labels2, loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=3, frameon=False)
+
+ax.axhline(y=exit_target_val/valuation_multiple*4, color='red', linestyle='--', linewidth=1) 
+ax.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
+ax2.yaxis.set_major_formatter(mtick.PercentFormatter(decimals=0))
+ax.spines['top'].set_visible(False)
+plt.title(f"Revenue Path to Exit (With EBITDA Margin)\nScenario: {tm_growth}% Service Growth | {s_job_growth}% S-Job Growth", fontsize=14)
+plt.tight_layout()
+plt.savefig('revenue_path_chart.png')
+print("Chart generated: revenue_path_chart.png")
