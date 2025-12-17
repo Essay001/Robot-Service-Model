@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 
 # --- PAGE CONFIGURATION ---
-st.set_page_config(page_title="2029 Strategic Exit Model (Smart Scale)", layout="wide")
+st.set_page_config(page_title="2029 Strategic Exit Model (Pooled Eng)", layout="wide")
 
 st.markdown("""
 <style>
@@ -207,7 +207,7 @@ with st.sidebar:
     
     # NEW TRIGGER
     s_job_hire_trigger = 1200000
-    st.info(f"💡 **Smart Scaling Trigger:** If S-Job Revenue is < **${s_job_hire_trigger/1000000:.1f}M**, we use Contractors (Variable Cost) instead of hiring Engineers.")
+    st.info(f"💡 **Smart Scaling Trigger:** If S-Job Revenue is < **${s_job_hire_trigger/1000000:.1f}M**, we use Contractors (Variable Cost). Above that, we hire **Pooled Engineers** (not 1 of each role).")
 
     with st.expander("S-Job Settings (Margin & Mix)"):
         st.caption("How do you quote a typical project?")
@@ -393,33 +393,43 @@ def run_fusion_model():
         sj_ce_fte = (s_job_labor_cost_budget * w_ce) / eng_annual_inf
         sj_prog_fte = (s_job_labor_cost_budget * w_prog) / eng_annual_inf
 
-        # 4. HIRING & CONTRACTING LOGIC (SMART SCALING)
+        # 4. HIRING & CONTRACTING LOGIC (SMART SCALING + POOLED ENG)
         
-        # Determine if we hire Engineers or Contract them
         use_contractors = curr_sjob_target < s_job_hire_trigger
         
         cogs_sjob_contractor = 0
         req_me = 0; req_ce = 0; req_prog = 0
         
         if use_contractors:
-            # CONTRACTOR MODE: 
-            # 1. Do not increase headcount demand beyond Base (Ops)
+            # CONTRACTOR MODE: Keep existing staff, pay variable cost for new work
             req_me = base_me
             req_ce = base_ce
             req_prog = base_prog
             
-            # 2. Charge Variable Cost (The "Transfer Price") for Engineering Work
-            # The Engineering Portion of the Budget = Total Budget * (w_me + w_ce + w_prog)
+            # Contractor Cost = Budget * (Eng Share)
             eng_portion_share = w_me + w_ce + w_prog
             cogs_sjob_contractor = s_job_labor_cost_budget * eng_portion_share
             
         else:
-            # HIRE MODE:
-            # 1. Trigger Full Headcount Requirements
-            req_me = math.ceil(sj_me_fte)
-            req_ce = math.ceil(sj_ce_fte)
-            req_prog = math.ceil(sj_prog_fte)
-            # 2. No Contractor Fee (Cost is covered by Payroll in COGS)
+            # HIRE MODE (POOLED):
+            # Sum the FTEs for all eng roles
+            total_eng_fte_demand = sj_me_fte + sj_ce_fte + sj_prog_fte
+            
+            # Round the TOTAL up (Pool)
+            total_eng_bodies_needed = math.ceil(total_eng_fte_demand)
+            
+            # Determine existing Engineering capacity
+            existing_eng_pool = cum_me + cum_ce + cum_prog
+            
+            # Calculate Net New Engineers needed
+            net_new_eng = max(0, total_eng_bodies_needed - existing_eng_pool)
+            
+            # Assign New Hires to "ME" bucket for simplicity (Project Engineer)
+            # We assume base staff (Base ME, Base CE) stays put.
+            req_me = cum_me + net_new_eng
+            req_ce = cum_ce 
+            req_prog = cum_prog
+            
             cogs_sjob_contractor = 0
 
         # Techs are always pooled/hired (since they share with Service)
@@ -427,7 +437,7 @@ def run_fusion_model():
         net_new_techs = final_tech_count - cum_techs
         cum_techs = final_tech_count
         
-        # Calculate Incremental Engineer Hires
+        # Calculate Incremental Engineer Hires (Pooled logic handled above)
         new_me = max(0, req_me - cum_me); cum_me = max(cum_me, req_me)
         new_ce = max(0, req_ce - cum_ce); cum_ce = max(cum_ce, req_ce)
         new_prog = max(0, req_prog - cum_prog); cum_prog = max(cum_prog, req_prog)
