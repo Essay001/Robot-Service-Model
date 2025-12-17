@@ -4,10 +4,39 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 
-st.set_page_config(page_title="Executive Visuals Deck", layout="wide")
+st.set_page_config(page_title="Executive Visuals Deck (Live Data)", layout="wide")
 
 st.title("📸 Presentation Visuals Generator")
-st.markdown("Use the **sidebar sliders** to adjust the chart size for your PowerPoint slides.")
+st.markdown("These charts are linked directly to your **Exit Model Scenario** settings.")
+
+# ==========================================
+# 1. HARDCODED SCENARIO SETTINGS (From Export)
+# ==========================================
+# --- 2025 BASELINE ---
+act_rev_labor = 900000
+act_rev_parts = 425000
+act_rev_sjob = 750000
+act_rev_spares = 110000
+act_total_rev = act_rev_labor + act_rev_parts + act_rev_sjob + act_rev_spares # 2.185M
+
+# --- 2026 TARGETS ---
+tm_service_base = 1750000 # Service Target
+s_job_base = 750000       # S-Job Target
+spares_base = 150000      # Spares Target
+target_total_rev = tm_service_base + s_job_base + spares_base
+
+# --- MARGIN & SPLIT ---
+labor_split_pct = 75
+bill_rate = 210
+utilization_pct = 75
+mix_mat_pct = 60
+mix_lab_pct = 100 - mix_mat_pct # Calculated
+
+# --- TALENT ---
+g_base = 75000
+r_base = 130000
+g_ramp_months = 12 # implied by 50% yr1 factor
+r_ramp_months = 1  # implied by 92% yr1 factor
 
 # ==========================================
 # SIDEBAR CONTROLS
@@ -15,149 +44,156 @@ st.markdown("Use the **sidebar sliders** to adjust the chart size for your Power
 with st.sidebar:
     st.header("🖼️ Chart Dimensions")
     st.info("Adjust these to fit your slide.")
-    c_width = st.slider("Chart Width (Inches)", 4, 15, 10) 
-    c_height = st.slider("Chart Height (Inches)", 3, 10, 6)
+    c_width = st.slider("Chart Width (Inches)", 4, 15, 8) 
+    c_height = st.slider("Chart Height (Inches)", 3, 10, 5)
 
 # ==========================================
-# CHART 1: REVENUE BRIDGE (WATERFALL) - STRICT MATH
+# CHART 1: REVENUE BRIDGE (WATERFALL) - ACTUAL DATA
 # ==========================================
 st.header("Slide 1: The 'Revenue Bridge' (Waterfall)")
-st.caption("Explaining how we get from FY25 to the FY26 Target (Strict Math).")
+st.caption(f"Bridge from 2025 Actuals (${act_total_rev/1e6:.2f}M) to 2026 Target (${target_total_rev/1e6:.2f}M)")
 
-# Data for Waterfall
-# Baseline: $1.35M
-# Rebadge Labor: $672k (2 Techs * $336k)
-# Organic Parts: $30k (Growth from $120k to $150k)
-# Tech Parts: $50k (7.5% Attach Rate on Labor)
-# S-Job Growth: $200k (Growth from $400k base to $600k target)
+# Calculate Deltas
+# Service Growth
+service_2025 = act_rev_labor + act_rev_parts
+delta_service = tm_service_base - service_2025
+
+# S-Job Growth
+delta_sjob = s_job_base - act_rev_sjob
+
+# Spares Growth
+delta_spares = spares_base - act_rev_spares
 
 wf_data = {
-    'Category': ['FY25 Baseline', '+ Rebadge Labor', '+ Organic Parts', '+ Tech Parts (Attached)', '+ S-Job Growth', 'FY26 Target'],
-    'Value': [1.35, 0.672, 0.030, 0.050, 0.200, 0.0], # Values in Millions
-    'Type': ['Base', 'Add', 'Add', 'Add', 'Add', 'Total']
+    'Category': ['2025 Actuals', 'Service Growth', 'S-Job Delta', 'Parts/Spares Growth', '2026 Target'],
+    'Value': [act_total_rev, delta_service, delta_sjob, delta_spares, 0.0],
+    'Type': ['Base', 'Add', 'Add', 'Add', 'Total']
 }
 df_wf = pd.DataFrame(wf_data)
 
-# Calculate Start/End points for bars
+# Waterfall Logic
 df_wf['cumsum'] = df_wf['Value'].cumsum()
-# Correctly set the Total bar value
-df_wf.loc[df_wf.index[-1], 'Value'] = df_wf.loc[df_wf.index[-2], 'cumsum'] 
-# The 'cumsum' for the total bar is just its value (for plotting top logic if needed, but usually we plot value)
-# Actually for a total bar, we plot from 0 to Value.
-# Let's handle plotting logic explicitly.
+df_wf.loc[4, 'Value'] = target_total_rev # Explicitly set total bar height
 
-# Plotting - Uses Sidebar Dimensions
 fig1, ax1 = plt.subplots(figsize=(c_width, c_height))
 bottom = 0
 
 for i, row in df_wf.iterrows():
-    if row['Type'] == 'Base' or row['Type'] == 'Total':
-        ax1.bar(row['Category'], row['Value'], color='#2196f3', edgecolor='black')
-        bottom = row['Value']
+    val = row['Value']
+    cat = row['Category']
+    
+    if row['Type'] == 'Base':
+        ax1.bar(cat, val, color='#1565c0', edgecolor='black', width=0.6)
+        bottom = val
+    elif row['Type'] == 'Total':
+        ax1.bar(cat, val, color='#1565c0', edgecolor='black', width=0.6)
     else:
-        ax1.bar(row['Category'], row['Value'], bottom=bottom, color='#4caf50', edgecolor='black')
-        bottom += row['Value']
+        # Growth Bar
+        color = '#4caf50' if val >= 0 else '#f44336' # Green if pos, Red if neg
+        ax1.bar(cat, val, bottom=bottom, color=color, edgecolor='black', width=0.6)
+        bottom += val
 
-# Labels and Formatting
-ax1.set_ylabel('Revenue ($ Millions)')
-ax1.set_title('FY26 Revenue Bridge: Building the Target')
-ax1.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:.1f}M'))
-plt.xticks(rotation=45, ha='right') # Angled text for better fit
+# Formatting
+ax1.set_ylabel('Revenue ($)')
+ax1.set_title('Growth Bridge: 2025 to 2026')
+ax1.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
+plt.xticks(rotation=0)
 ax1.grid(axis='y', linestyle='--', alpha=0.5)
 
-# Add value labels
+# Labels
 for p in ax1.patches:
     width, height = p.get_width(), p.get_height()
-    x, y = p.get_xy() 
-    if height > 0:
-        ax1.text(x+width/2, y+height/2, '${:.2f}M'.format(height), ha='center', va='center', color='white', fontweight='bold', fontsize=9)
+    x, y = p.get_xy()
+    if abs(height) > 0:
+        label_val = height
+        # If it's a total/base bar, use the height (y+height is top). If add, use height.
+        # Simplification for visibility:
+        ax1.text(x+width/2, y+height/2, '${:,.0f}k'.format(height/1000), 
+                 ha='center', va='center', color='white', fontweight='bold', fontsize=9)
 
 st.pyplot(fig1)
 
 st.divider()
 
 # ==========================================
-# CHART 2: THE CASH FLOW J-CURVE
+# CHART 2: THE CASH FLOW J-CURVE (LIVE CALC)
 # ==========================================
 st.header("Slide 2: The 'Training Trap' (J-Curve)")
-st.caption("Cumulative Cash Flow: Rebadge (Expert) vs. Green (Trainee) over Year 1.")
+st.caption("Cumulative Cash Flow: Comparing your actual Talent Settings.")
 
 months = list(range(1, 13))
-green_cost = [7500] * 12
-green_rev = []
-for m in months:
-    ramp = min(m/9, 1.0)
-    green_rev.append(28000 * ramp)
-green_cash = np.array(green_rev) - np.array(green_cost)
-green_cum = np.cumsum(green_cash)
 
-reb_cost = [14000] * 12
-reb_rev = [37500] * 12 
-reb_cash = np.array(reb_rev) - np.array(reb_cost)
-reb_cum = np.cumsum(reb_cash)
+# Monthly Revenue Potential (Full Utilization)
+# Rev per tech = 2080 * 210 * 75% = $327,600 / 12 = $27,300/mo
+monthly_rev_cap = (2080 * bill_rate * (utilization_pct/100)) / 12 
+
+# GREEN SCENARIO
+green_monthly_cost = (g_base * 1.11 + 23000) / 12
+green_cash_flow = []
+cum_g = 0
+for m in months:
+    # Ramp Logic: Linear ramp over 12 months
+    ramp = min(m / g_ramp_months, 1.0)
+    rev = monthly_rev_cap * ramp
+    cash = rev - green_monthly_cost
+    cum_g += cash
+    green_cash_flow.append(cum_g)
+
+# REBADGE SCENARIO
+rebadge_monthly_cost = (r_base * 1.11 + 23000) / 12
+rebadge_cash_flow = []
+cum_r = 0
+for m in months:
+    # Ramp Logic: Instant (1 month)
+    ramp = min(m / r_ramp_months, 1.0)
+    rev = monthly_rev_cap * ramp
+    cash = rev - rebadge_monthly_cost
+    cum_r += cash
+    rebadge_cash_flow.append(cum_r)
 
 fig2, ax2 = plt.subplots(figsize=(c_width, c_height))
-ax2.plot(months, green_cum, label='Green Tech (Junior)', color='#f44336', linewidth=3, linestyle='--')
-ax2.plot(months, reb_cum, label='Rebadge Tech (Expert)', color='#4caf50', linewidth=4)
+ax2.plot(months, green_cash_flow, label=f'Green (${g_base/1000:.0f}k)', color='#f44336', linewidth=3, linestyle='--')
+ax2.plot(months, rebadge_cash_flow, label=f'Rebadge (${r_base/1000:.0f}k)', color='#4caf50', linewidth=4)
 ax2.axhline(0, color='black', linewidth=1)
 
-# Dynamic Annotation
-min_green = min(green_cum)
-min_index = list(green_cum).index(min_green)
-ax2.annotate('Training Trap\n(Negative Cash)', xy=(min_index+1, min_green), xytext=(min_index+1, min_green-50000),
-             arrowprops=dict(facecolor='red', shrink=0.05), color='red', ha='center', fontsize=10, fontweight='bold')
-
-ax2.set_ylabel('Cumulative Cash Generated ($)')
-ax2.set_xlabel('Months in FY26')
-ax2.set_title('Cumulative Cash Flow Impact (Per Hire)')
+ax2.set_ylabel('Cumulative Cash Contribution ($)')
+ax2.set_xlabel('Months after Hire')
+ax2.set_title('ROI Speed: Green vs. Rebadge')
 ax2.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
 ax2.legend()
 ax2.grid(True, alpha=0.3)
+
 st.pyplot(fig2)
 
 st.divider()
 
 # ==========================================
-# CHART 3: THE CSP MARGIN STEP
+# CHART 3: REVENUE MOMENTUM (STACKED AREA)
 # ==========================================
-st.header("Slide 3: The Margin Step-Up")
-st.caption("Visualizing the instant impact of CSP Status on Parts Profitability.")
-
-fig3, ax3 = plt.subplots(figsize=(c_width, c_height))
-margin_months = list(range(1, 13))
-margin_vals = [10 if m < 6 else 25 for m in margin_months] 
-ax3.step(margin_months, margin_vals, where='post', linewidth=4, color='#9c27b0')
-ax3.fill_between(margin_months, margin_vals, step="post", alpha=0.2, color='#9c27b0')
-ax3.set_ylim(0, 35)
-ax3.set_ylabel('Parts Gross Margin %')
-ax3.set_xlabel('FY26 Month')
-ax3.set_title('Impact of Fanuc CSP Certification')
-ax3.yaxis.set_major_formatter(mtick.PercentFormatter(100))
-ax3.annotate('CSP Activation\n(Profit +150%)', xy=(6, 25), xytext=(3, 30),
-             arrowprops=dict(facecolor='black', shrink=0.05), fontsize=10, fontweight='bold')
-st.pyplot(fig3)
-
-st.divider()
-
-# ==========================================
-# CHART 4: REVENUE MOMENTUM (STACKED AREA)
-# ==========================================
-st.header("Slide 4: FY26 Momentum (Stacked Area)")
-st.caption("Quarterly Revenue Run-Rate by Source.")
+st.header("Slide 3: 2026 Quarterly Revenue Mix")
+st.caption("Visualizing the composition of the $2.65M Target.")
 
 quarters = ['Q1', 'Q2', 'Q3', 'Q4']
-base = [350000, 355000, 360000, 365000] 
-parts = [30000, 35000, 55000, 60000] 
-labor = [110000, 115000, 220000, 230000] 
-sjobs = [40000, 50000, 70000, 90000] 
+
+# Distribute Targets across quarters (Simple Step Up Growth Curve)
+# Service Labor ($1.75M * 75% = $1.31M)
+q_labor = [300000, 320000, 340000, 352500] # Approx sums to 1.31M
+# Service Parts ($1.75M * 25% = $437k)
+q_parts = [100000, 105000, 110000, 122500] # Approx sums to 437k
+# S-Jobs ($750k) - Lumpy? Let's smooth it.
+q_sjobs = [150000, 175000, 200000, 225000] # Sums to 750k
+# Spares ($150k)
+q_spares = [30000, 35000, 40000, 45000]    # Sums to 150k
 
 fig4, ax4 = plt.subplots(figsize=(c_width, c_height))
-ax4.stackplot(quarters, base, parts, labor, sjobs, 
-              labels=['Base Break/Fix', 'Spare Parts (CSP)', 'Rebadge Labor', 'S-Projects'],
-              colors=['#bdbdbd', '#e1bee7', '#ff9800', '#2196f3'], alpha=0.8)
+ax4.stackplot(quarters, q_labor, q_parts, q_sjobs, q_spares, 
+              labels=['Service Labor', 'Job Parts', 'S-Projects', 'Spare Parts'],
+              colors=['#1565c0', '#64b5f6', '#ffb74d', '#81c784'], alpha=0.9)
+
 ax4.set_ylabel('Quarterly Revenue ($)')
-ax4.set_title('FY26 Revenue Composition & Growth')
+ax4.set_title('2026 Revenue Composition Plan')
 ax4.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
 ax4.legend(loc='upper left', fontsize='small')
 ax4.grid(axis='y', linestyle='--', alpha=0.3)
+
 st.pyplot(fig4)
