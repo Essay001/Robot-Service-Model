@@ -20,8 +20,8 @@ act_rev_spares = 110000
 act_total_rev = act_rev_labor + act_rev_parts + act_rev_sjob + act_rev_spares # $2.185M
 
 # 2026 TARGETS
-tm_service_target = 1650000
-s_job_target = 700000
+tm_service_target = 1550000
+s_job_target = 800000
 spares_target = 150000
 total_target = tm_service_target + s_job_target + spares_target # $2.50M
 
