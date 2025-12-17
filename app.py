@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 
 # --- PAGE CONFIGURATION ---
-st.set_page_config(page_title="2029 Strategic Exit Model (Final)", layout="wide")
+st.set_page_config(page_title="2029 Strategic Exit Model (Smart Scale)", layout="wide")
 
 st.markdown("""
 <style>
@@ -204,6 +204,10 @@ with st.sidebar:
         help="Projected total revenue for Projects/Integrations."
     )
     s_job_growth = st.number_input("S-Job Growth %", value=15, step=1, min_value=0, max_value=100)
+    
+    # NEW TRIGGER
+    s_job_hire_trigger = 1200000
+    st.info(f"💡 **Smart Scaling Trigger:** If S-Job Revenue is < **${s_job_hire_trigger/1000000:.1f}M**, we use Contractors (Variable Cost) instead of hiring Engineers.")
 
     with st.expander("S-Job Settings (Margin & Mix)"):
         st.caption("How do you quote a typical project?")
@@ -324,7 +328,8 @@ def run_fusion_model():
         "Net Income": act_ebitda * (1 - (tax_rate/100)),
         "Net Margin %": (act_ebitda * (1 - (tax_rate/100))) / act_total_rev if act_total_rev else 0,
         "D&A": 0, "Interest": 0, "Taxes": 0, "Rework": 0,
-        "OpEx: Base": act_opex, "OpEx: Managers": 0, "OpEx: Sales": 0, "OpEx: Rework": 0
+        "OpEx: Base": act_opex, "OpEx: Managers": 0, "OpEx: Sales": 0, "OpEx: Rework": 0,
+        "COGS: SJob Contract": 0
     }
 
     years = [2026, 2027, 2028, 2029]
@@ -379,7 +384,7 @@ def run_fusion_model():
         new_hire_yr1_capacity = full_capacity_per_tech * w_ramp_factor
         needed_new_techs_service = math.ceil(gap_revenue / new_hire_yr1_capacity)
         
-        # S-Jobs
+        # S-Jobs (Calculate Workload)
         s_job_labor_revenue = curr_sjob_target * (mix_lab_pct/100)
         s_job_labor_cost_budget = s_job_labor_revenue * (1 - (target_margin_lab/100))
         
@@ -388,13 +393,41 @@ def run_fusion_model():
         sj_ce_fte = (s_job_labor_cost_budget * w_ce) / eng_annual_inf
         sj_prog_fte = (s_job_labor_cost_budget * w_prog) / eng_annual_inf
 
-        final_tech_count = cum_techs + needed_new_techs_service + math.ceil(sj_tech_fte)
+        # 4. HIRING & CONTRACTING LOGIC (SMART SCALING)
         
-        # 4. HIRING
+        # Determine if we hire Engineers or Contract them
+        use_contractors = curr_sjob_target < s_job_hire_trigger
+        
+        cogs_sjob_contractor = 0
+        req_me = 0; req_ce = 0; req_prog = 0
+        
+        if use_contractors:
+            # CONTRACTOR MODE: 
+            # 1. Do not increase headcount demand beyond Base (Ops)
+            req_me = base_me
+            req_ce = base_ce
+            req_prog = base_prog
+            
+            # 2. Charge Variable Cost (The "Transfer Price") for Engineering Work
+            # The Engineering Portion of the Budget = Total Budget * (w_me + w_ce + w_prog)
+            eng_portion_share = w_me + w_ce + w_prog
+            cogs_sjob_contractor = s_job_labor_cost_budget * eng_portion_share
+            
+        else:
+            # HIRE MODE:
+            # 1. Trigger Full Headcount Requirements
+            req_me = math.ceil(sj_me_fte)
+            req_ce = math.ceil(sj_ce_fte)
+            req_prog = math.ceil(sj_prog_fte)
+            # 2. No Contractor Fee (Cost is covered by Payroll in COGS)
+            cogs_sjob_contractor = 0
+
+        # Techs are always pooled/hired (since they share with Service)
+        final_tech_count = cum_techs + needed_new_techs_service + math.ceil(sj_tech_fte)
         net_new_techs = final_tech_count - cum_techs
         cum_techs = final_tech_count
         
-        req_me = math.ceil(sj_me_fte); req_ce = math.ceil(sj_ce_fte); req_prog = math.ceil(sj_prog_fte)
+        # Calculate Incremental Engineer Hires
         new_me = max(0, req_me - cum_me); cum_me = max(cum_me, req_me)
         new_ce = max(0, req_ce - cum_ce); cum_ce = max(cum_ce, req_ce)
         new_prog = max(0, req_prog - cum_prog); cum_prog = max(cum_prog, req_prog)
@@ -407,9 +440,8 @@ def run_fusion_model():
         # 5. OPS
         locs = math.ceil(cum_techs / techs_per_loc_input) 
         
-        # -- FIX FOR MANAGERS (First one free) --
+        # Managers
         managers_total = math.ceil(cum_techs / 10)
-        # We assume 1st manager is covered in Base OpEx ($425k)
         managers_incremental = max(0, managers_total - 1)
         
         sales_reps = math.floor(total_rev / sales_trigger)
@@ -423,7 +455,7 @@ def run_fusion_model():
         cogs_job_parts = curr_job_parts_rev * (1 - (job_parts_margin/100))
         cogs_spares = curr_spares_target * (1 - (spares_margin/100))
 
-        total_cogs = cogs_labor_tech + cogs_eng_labor + cogs_job_parts + cogs_spares + cogs_sjob_mat
+        total_cogs = cogs_labor_tech + cogs_eng_labor + cogs_job_parts + cogs_spares + cogs_sjob_mat + cogs_sjob_contractor
         gross_profit = total_rev - total_cogs
 
         # OpEx Breakdown
@@ -473,6 +505,7 @@ def run_fusion_model():
             "OpEx: Hiring": opex_hire, 
             "OpEx: Rent": opex_rent, 
             "OpEx: Central": central_fee, 
+            "COGS: SJob Contract": cogs_sjob_contractor,
             "Total COGS": total_cogs, "Total OpEx": total_opex,
             "D&A": da_cost, "Interest": interest, "Taxes": taxes
         })
@@ -580,7 +613,7 @@ def format_df(d, m): return d.style.format(m)
 
 with tab1:
     st.markdown("### P&L Statement (The Waterfall)")
-    cols_pl = ['Year', 'Total Revenue', 'Total COGS', 'Gross Profit', 'Gross Margin %', 'Total OpEx', 'EBITDA', 'EBITDA Margin %', 'Net Income', 'Net Margin %']
+    cols_pl = ['Year', 'Total Revenue', 'Total COGS', 'Gross Profit', 'Gross Margin %', 'Total OpEx', 'EBITDA', 'EBITDA Margin %', 'Net Income', 'Net Margin %', 'COGS: SJob Contract']
     fmt = {'Year': '{:.0f}', 'Gross Margin %': '{:.1%}', 'EBITDA Margin %': '{:.1%}', 'Net Margin %': '{:.1%}'}
     for c in cols_pl:
         if c not in fmt: fmt[c] = "${:,.0f}"
