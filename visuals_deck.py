@@ -13,10 +13,10 @@ st.markdown("Use the **sidebar sliders** to adjust the chart size for your Power
 # SIDEBAR CONTROLS
 # ==========================================
 with st.sidebar:
-st.header("🖼️ Chart Dimensions")
-st.info("Adjust these to fit your slide.")
-c_width = st.slider("Chart Width (Inches)", 4, 15, 6) 
-c_height = st.slider("Chart Height (Inches)", 3, 10, 4)
+    st.header("🖼️ Chart Dimensions")
+    st.info("Adjust these to fit your slide.")
+    c_width = st.slider("Chart Width (Inches)", 4, 15, 10) 
+    c_height = st.slider("Chart Height (Inches)", 3, 10, 6)
 
 # ==========================================
 # CHART 1: REVENUE BRIDGE (WATERFALL) - STRICT MATH
@@ -25,38 +25,38 @@ st.header("Slide 1: The 'Revenue Bridge' (Waterfall)")
 st.caption("Explaining how we get from FY25 to the FY26 Target (Strict Math).")
 
 # Data for Waterfall
-# Baseline: $1.5M
 # Baseline: $1.35M
 # Rebadge Labor: $672k (2 Techs * $336k)
 # Organic Parts: $30k (Growth from $120k to $150k)
-# Tech Parts: $100k (15% Attach Rate on Labor)
 # Tech Parts: $50k (7.5% Attach Rate on Labor)
 # S-Job Growth: $200k (Growth from $400k base to $600k target)
 
 wf_data = {
-'Category': ['FY25 Baseline', '+ Rebadge Labor', '+ Organic Parts', '+ Tech Parts (Attached)', '+ S-Job Growth', 'FY26 Target'],
-    'Value': [1.5, 0.672, 0.030, 0.100, 0.200, 0.0], # Values in Millions
+    'Category': ['FY25 Baseline', '+ Rebadge Labor', '+ Organic Parts', '+ Tech Parts (Attached)', '+ S-Job Growth', 'FY26 Target'],
     'Value': [1.35, 0.672, 0.030, 0.050, 0.200, 0.0], # Values in Millions
-'Type': ['Base', 'Add', 'Add', 'Add', 'Add', 'Total']
+    'Type': ['Base', 'Add', 'Add', 'Add', 'Add', 'Total']
 }
 df_wf = pd.DataFrame(wf_data)
 
 # Calculate Start/End points for bars
 df_wf['cumsum'] = df_wf['Value'].cumsum()
-df_wf.loc[df_wf.index[-1], 'Value'] = df_wf.loc[df_wf.index[-2], 'cumsum'] # Set Total
-df_wf.loc[df_wf.index[-1], 'cumsum'] = df_wf.loc[df_wf.index[-1], 'Value']
+# Correctly set the Total bar value
+df_wf.loc[df_wf.index[-1], 'Value'] = df_wf.loc[df_wf.index[-2], 'cumsum'] 
+# The 'cumsum' for the total bar is just its value (for plotting top logic if needed, but usually we plot value)
+# Actually for a total bar, we plot from 0 to Value.
+# Let's handle plotting logic explicitly.
 
 # Plotting - Uses Sidebar Dimensions
 fig1, ax1 = plt.subplots(figsize=(c_width, c_height))
 bottom = 0
 
 for i, row in df_wf.iterrows():
-if row['Type'] == 'Base' or row['Type'] == 'Total':
-ax1.bar(row['Category'], row['Value'], color='#2196f3', edgecolor='black')
-bottom = row['Value']
-else:
-ax1.bar(row['Category'], row['Value'], bottom=bottom, color='#4caf50', edgecolor='black')
-bottom += row['Value']
+    if row['Type'] == 'Base' or row['Type'] == 'Total':
+        ax1.bar(row['Category'], row['Value'], color='#2196f3', edgecolor='black')
+        bottom = row['Value']
+    else:
+        ax1.bar(row['Category'], row['Value'], bottom=bottom, color='#4caf50', edgecolor='black')
+        bottom += row['Value']
 
 # Labels and Formatting
 ax1.set_ylabel('Revenue ($ Millions)')
@@ -64,6 +64,13 @@ ax1.set_title('FY26 Revenue Bridge: Building the Target')
 ax1.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:.1f}M'))
 plt.xticks(rotation=45, ha='right') # Angled text for better fit
 ax1.grid(axis='y', linestyle='--', alpha=0.5)
+
+# Add value labels
+for p in ax1.patches:
+    width, height = p.get_width(), p.get_height()
+    x, y = p.get_xy() 
+    if height > 0:
+        ax1.text(x+width/2, y+height/2, '${:.2f}M'.format(height), ha='center', va='center', color='white', fontweight='bold', fontsize=9)
 
 st.pyplot(fig1)
 
@@ -79,8 +86,8 @@ months = list(range(1, 13))
 green_cost = [7500] * 12
 green_rev = []
 for m in months:
-ramp = min(m/9, 1.0)
-green_rev.append(28000 * ramp)
+    ramp = min(m/9, 1.0)
+    green_rev.append(28000 * ramp)
 green_cash = np.array(green_rev) - np.array(green_cost)
 green_cum = np.cumsum(green_cash)
 
@@ -93,8 +100,12 @@ fig2, ax2 = plt.subplots(figsize=(c_width, c_height))
 ax2.plot(months, green_cum, label='Green Tech (Junior)', color='#f44336', linewidth=3, linestyle='--')
 ax2.plot(months, reb_cum, label='Rebadge Tech (Expert)', color='#4caf50', linewidth=4)
 ax2.axhline(0, color='black', linewidth=1)
-ax2.annotate('Training Trap\n(Negative Cash)', xy=(4, -15000), xytext=(4, -90000),
-arrowprops=dict(facecolor='red', shrink=0.05), color='red', ha='center', fontsize=9)
+
+# Dynamic Annotation
+min_green = min(green_cum)
+min_index = list(green_cum).index(min_green)
+ax2.annotate('Training Trap\n(Negative Cash)', xy=(min_index+1, min_green), xytext=(min_index+1, min_green-50000),
+             arrowprops=dict(facecolor='red', shrink=0.05), color='red', ha='center', fontsize=10, fontweight='bold')
 
 ax2.set_ylabel('Cumulative Cash Generated ($)')
 ax2.set_xlabel('Months in FY26')
@@ -123,7 +134,7 @@ ax3.set_xlabel('FY26 Month')
 ax3.set_title('Impact of Fanuc CSP Certification')
 ax3.yaxis.set_major_formatter(mtick.PercentFormatter(100))
 ax3.annotate('CSP Activation\n(Profit +150%)', xy=(6, 25), xytext=(3, 30),
-arrowprops=dict(facecolor='black', shrink=0.05), fontsize=10, fontweight='bold')
+             arrowprops=dict(facecolor='black', shrink=0.05), fontsize=10, fontweight='bold')
 st.pyplot(fig3)
 
 st.divider()
@@ -142,8 +153,8 @@ sjobs = [40000, 50000, 70000, 90000]
 
 fig4, ax4 = plt.subplots(figsize=(c_width, c_height))
 ax4.stackplot(quarters, base, parts, labor, sjobs, 
-labels=['Base Break/Fix', 'Spare Parts (CSP)', 'Rebadge Labor', 'S-Projects'],
-colors=['#bdbdbd', '#e1bee7', '#ff9800', '#2196f3'], alpha=0.8)
+              labels=['Base Break/Fix', 'Spare Parts (CSP)', 'Rebadge Labor', 'S-Projects'],
+              colors=['#bdbdbd', '#e1bee7', '#ff9800', '#2196f3'], alpha=0.8)
 ax4.set_ylabel('Quarterly Revenue ($)')
 ax4.set_title('FY26 Revenue Composition & Growth')
 ax4.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
