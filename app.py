@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 
 # --- PAGE CONFIGURATION ---
-st.set_page_config(page_title="2029 Strategic Exit Model (Master)", layout="wide")
+st.set_page_config(page_title="2029 Strategic Exit Model (Transparency)", layout="wide")
 
 st.markdown("""
 <style>
@@ -231,7 +231,6 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
 
-        # --- RESTORED RESOURCE SPLIT ---
         st.divider()
         st.caption("Resource Split (Of the Labor Portion):")
         c1, c2 = st.columns(2)
@@ -324,7 +323,9 @@ def run_fusion_model():
         "MEs": base_me, "CEs": base_ce, "Progs": base_prog,
         "Net Income": act_ebitda * (1 - (tax_rate/100)),
         "Net Margin %": (act_ebitda * (1 - (tax_rate/100))) / act_total_rev if act_total_rev else 0,
-        "D&A": 0, "Interest": 0, "Taxes": 0, "Rework": 0
+        "D&A": 0, "Interest": 0, "Taxes": 0, "Rework": 0,
+        # Placeholders for 2025 Breakdown
+        "OpEx: Base": act_opex, "OpEx: Managers": 0, "OpEx: Sales": 0, "OpEx: Rework": 0
     }
 
     years = [2026, 2027, 2028, 2029]
@@ -421,7 +422,7 @@ def run_fusion_model():
         total_cogs = cogs_labor_tech + cogs_eng_labor + cogs_job_parts + cogs_spares + cogs_sjob_mat
         gross_profit = total_rev - total_cogs
 
-        # OpEx
+        # OpEx Breakdown
         base_overhead_curr = base_overhead_start * inf
         billable_locs = max(0, locs - 1) if is_hq_free else locs
         opex_rent = billable_locs * c_rent_inf * 12
@@ -429,11 +430,9 @@ def run_fusion_model():
         opex_mgr = managers * (85000 * 1.2 * inf)
         opex_sales = sales_reps * (sales_rep_cost * inf)
         opex_hire = total_hires * c_hire_inf
-        
-        # Rework Tax
         opex_rework = total_rev * w_rework_pct
 
-        total_opex = base_overhead_curr + opex_rent + opex_hire + central_fee + opex_sales + opex_rework
+        total_opex = base_overhead_curr + opex_rent + opex_hire + central_fee + opex_sales + opex_rework + opex_mgr
 
         ebitda = gross_profit - total_opex
         da_cost = total_rev * (depreciation_pct / 100)
@@ -458,8 +457,15 @@ def run_fusion_model():
             "Net Margin %": net_income/total_rev,
             "Techs": cum_techs, "MEs": cum_me, "CEs": cum_ce, "Progs": cum_prog,
             "Locations": locs, "Sales Reps": sales_reps, "Total Hires": total_hires,
-            "OpEx: Hiring": opex_hire, "Eng FTE": total_eng_fte_actual, 
-            "OpEx: Rent": opex_rent, "OpEx: Central": central_fee, "OpEx: Rework": opex_rework,
+            "Eng FTE": total_eng_fte_actual, 
+            # Detailed Breakdown for Audit Tab
+            "OpEx: Base": base_overhead_curr,
+            "OpEx: Managers": opex_mgr,
+            "OpEx: Sales": opex_sales,
+            "OpEx: Rework": opex_rework,
+            "OpEx: Hiring": opex_hire, 
+            "OpEx: Rent": opex_rent, 
+            "OpEx: Central": central_fee, 
             "Total COGS": total_cogs, "Total OpEx": total_opex,
             "D&A": da_cost, "Interest": interest, "Taxes": taxes
         })
@@ -507,7 +513,6 @@ with c2:
 
 with c3:
     # 3. RESTORED REVENUE CAPACITY CALLOUT
-    # Calc annual rev per tech
     lab_cap = 2080 * utilization * bill_rate
     ticket_cap = lab_cap / (labor_split_pct/100)
     parts_cap = ticket_cap - lab_cap
@@ -569,7 +574,7 @@ def format_df(d, m): return d.style.format(m)
 
 with tab1:
     st.markdown("### P&L Statement (The Waterfall)")
-    cols_pl = ['Year', 'Total Revenue', 'Total COGS', 'Gross Profit', 'Total OpEx', 'EBITDA', 'EBITDA Margin %', 'Net Income', 'OpEx: Rework']
+    cols_pl = ['Year', 'Total Revenue', 'Total COGS', 'Gross Profit', 'Total OpEx', 'EBITDA', 'EBITDA Margin %', 'Net Income']
     fmt = {'Year': '{:.0f}', 'EBITDA Margin %': '{:.1%}', 'Net Margin %': '{:.1%}'}
     for c in cols_pl:
         if c not in fmt: fmt[c] = "${:,.0f}"
@@ -582,13 +587,17 @@ with tab2:
     st.dataframe(format_df(df[cols], fmt), use_container_width=True)
 
 with tab3:
-    st.markdown("### Hiring & Operations Audit")
-    cols = ['Year', 'Total Hires', 'OpEx: Hiring', 'OpEx: Rent', 'OpEx: Central', 'OpEx: Rework']
-    fmt = {'Year':'{:.0f}', 'Total Hires':'{:.0f}', 'OpEx: Hiring':'${:,.0f}', 'OpEx: Rent':'${:,.0f}', 'OpEx: Central':'${:,.0f}', 'OpEx: Rework':'${:,.0f}'}
+    st.markdown("### Hiring & Operations Audit (Where is the money going?)")
+    cols = ['Year', 'OpEx: Base', 'OpEx: Managers', 'OpEx: Sales', 'OpEx: Rework', 'OpEx: Hiring', 'OpEx: Rent', 'OpEx: Central']
+    fmt = {'Year':'{:.0f}'}
+    for c in cols:
+        if c != 'Year': fmt[c] = "${:,.0f}"
+    
     st.dataframe(format_df(df[cols], fmt), use_container_width=True)
     st.markdown(f"""
     <div class='audit-box'>
     <b>Rent Rule:</b> HQ Free = {is_hq_free}. You pay for Locs-1.<br>
     <b>Central Rule:</b> Starts in {central_start_year} AND requires > 1 Location.
+    <b>Manager Rule:</b> 1 Manager per 10 Techs (Minimum 1).
     </div>
     """, unsafe_allow_html=True)
