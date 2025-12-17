@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 
 # --- PAGE CONFIGURATION ---
-st.set_page_config(page_title="Growth Strategy Comparison", layout="wide")
+st.set_page_config(page_title="Growth Strategy Comparison (Final)", layout="wide")
 
 st.markdown("""
 <style>
@@ -17,30 +17,34 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚖️ Talent Strategy: Green vs. Rebadge")
+st.title("⚖️ Talent Strategy: Green vs. Rebadge (Calibrated)")
 st.markdown("Comparing **Standard Hiring** (Lower cost, slow ramp) vs. **Rebadging** (High cost, instant revenue).")
 
 # ==========================================
-# 1. SIDEBAR INPUTS
+# 1. SIDEBAR INPUTS (Hardcoded to Match App.py)
 # ==========================================
 
 with st.sidebar:
-    st.header("1. Baseline")
-    base_rev_2025 = st.number_input("2025 Start Revenue ($)", value=1500000, step=100000, format="%d")
+    st.header("1. Baseline (From Exit Model)")
+    # 2025 Actuals: 900k Labor + 425k Parts = 1.325M
+    base_rev_2025 = st.number_input("2025 Start Revenue ($)", value=1325000, step=100000, format="%d")
     
-    # UPDATED DEFAULT: 12%
-    base_growth_pct = st.slider("Base Biz Organic Growth %", 0, 20, 12)
+    # ADJUSTED: Set to 25% so that 1.325M grows to ~1.65M in 2026 (Matching your $2.5M total target)
+    base_growth_pct = st.slider("Base Biz Organic Growth %", 0, 30, 25)
     
     st.divider()
     
     st.header("2. Revenue Economics")
-    # UPDATED DEFAULT: $438,000
-    rev_per_tech = st.number_input("Max Revenue per Tech ($)", value=438000, step=10000)
-    parts_ratio = 0.175 # Hardcoded approx based on prev discussion
+    # Calculated: 2080 * 0.75 (Util) * 210 (Bill) = $327,600 Labor Rev per Tech
+    # Total Rev per Tech (Labor + Parts) = $327,600 / 0.75 = $436,800
+    rev_per_tech = st.number_input("Max Revenue per Tech ($)", value=436800, step=10000)
+    
+    # Matching 1 - (labor_split_pct/100) = 0.25
+    parts_ratio = 0.25 
     
     st.divider()
     
-    st.header("3. Scenario Inputs (Apples to Apples)")
+    st.header("3. Scenario Inputs")
     
     # Unified Slider
     hires_per_year = st.slider("Hires Per Year (Both Scenarios)", 1, 6, 2, help="We hire the same number of people in both models.")
@@ -48,18 +52,19 @@ with st.sidebar:
     st.markdown("---")
     st.caption("🐢 **Scenario A: Green Techs**")
     
-    # UPDATED DEFAULT: $75,000
+    # Matching g_base
     green_cost = st.number_input("Green Start Cost ($)", value=75000, step=5000)
     
-    # UPDATED DEFAULT: 12 Months
+    # Matching g_ramp_yr1_factor = 0.5 (12 months)
     green_ramp = st.slider("Green Ramp Up (Months)", 0, 18, 12)
     
-    # NEW: REALITY CHECK
-    green_raise_yr3 = st.checkbox("Apply Market Raise in Year 3?", value=True, help="If checked, Green tech cost jumps to $120k after 2 years so they don't quit.")
+    green_raise_yr3 = st.checkbox("Apply Market Raise in Year 3?", value=True)
     
     st.markdown("---")
     st.caption("🐇 **Scenario B: Rebadge Techs**")
+    # Matching r_base
     rebadge_cost = st.number_input("Rebadge Cost ($)", value=130000, step=5000)
+    # Matching r_ramp_yr1_factor = 0.92 (~1 month)
     rebadge_ramp = st.slider("Rebadge Ramp (Months)", 0, 12, 1)
 
 # ==========================================
