@@ -27,12 +27,15 @@ st.markdown("Comparing **Standard Hiring** (Lower cost, slow ramp) vs. **Rebadgi
 with st.sidebar:
     st.header("1. Baseline")
     base_rev_2025 = st.number_input("2025 Start Revenue ($)", value=1500000, step=100000, format="%d")
-    base_growth_pct = st.slider("Base Biz Organic Growth %", 0, 20, 5)
+    
+    # UPDATED DEFAULT: 12%
+    base_growth_pct = st.slider("Base Biz Organic Growth %", 0, 20, 12)
     
     st.divider()
     
     st.header("2. Revenue Economics")
-    rev_per_tech = st.number_input("Max Revenue per Tech ($)", value=448000, step=10000)
+    # UPDATED DEFAULT: $438,000
+    rev_per_tech = st.number_input("Max Revenue per Tech ($)", value=438000, step=10000)
     parts_ratio = 0.175 # Hardcoded approx based on prev discussion
     
     st.divider()
@@ -44,8 +47,13 @@ with st.sidebar:
     
     st.markdown("---")
     st.caption("🐢 **Scenario A: Green Techs**")
-    green_cost = st.number_input("Green Start Cost ($)", value=90000, step=5000)
-    green_ramp = st.slider("Green Ramp Up (Months)", 0, 18, 9)
+    
+    # UPDATED DEFAULT: $75,000
+    green_cost = st.number_input("Green Start Cost ($)", value=75000, step=5000)
+    
+    # UPDATED DEFAULT: 12 Months
+    green_ramp = st.slider("Green Ramp Up (Months)", 0, 18, 12)
+    
     # NEW: REALITY CHECK
     green_raise_yr3 = st.checkbox("Apply Market Raise in Year 3?", value=True, help="If checked, Green tech cost jumps to $120k after 2 years so they don't quit.")
     
