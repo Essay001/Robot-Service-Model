@@ -650,3 +650,70 @@ with tab3:
     <b>Manager Rule:</b> 1 Manager per 10 Techs (First one is Free/Base).
     </div>
     """, unsafe_allow_html=True)
+# ==========================================
+# 6. EXPORT SETTINGS (Add this to bottom of app.py)
+# ==========================================
+with st.sidebar:
+    st.divider()
+    with st.expander("💾 Export Current Settings"):
+        st.write("Copy this code block and paste it to the AI:")
+        
+        # Create a dictionary of current values
+        config_export = f"""
+# --- CURRENT SCENARIO SETTINGS ---
+# 1. EXIT GOAL
+exit_target_val = {exit_target_val}
+valuation_multiple = {valuation_multiple}
+
+# 2. TALENT
+mix_pct = {mix_pct}
+g_base = {g_base}
+r_base = {r_base}
+
+# 3. 2025 BASELINE
+act_rev_labor = {act_rev_labor}
+act_rev_parts = {act_rev_parts}
+act_rev_sjob = {act_rev_sjob}
+act_rev_spares = {act_rev_spares}
+act_cogs = {act_cogs}
+act_opex = {act_opex}
+
+# 4. SERVICE REVENUE
+tm_service_base = {tm_service_base}
+tm_growth = {tm_growth}
+labor_split_pct = {labor_split_pct}
+bill_rate = {bill_rate}
+utilization_pct = {utilization_pct}
+job_parts_margin = {job_parts_margin}
+
+# 5. S-JOBS
+s_job_base = {s_job_base}
+s_job_growth = {s_job_growth}
+s_job_hire_trigger = {s_job_hire_trigger}
+mix_mat_pct = {mix_mat_pct}
+target_margin_mat = {target_margin_mat}
+target_margin_lab = {target_margin_lab}
+# Splits
+w_tech = {w_tech * 100}
+w_me = {w_me * 100}
+w_ce = {w_ce * 100}
+w_prog = {w_prog * 100}
+
+# 6. SPARES
+spares_base = {spares_base}
+spares_growth = {spares_growth}
+spares_margin = {spares_margin}
+
+# 7. OPS & COSTS
+base_techs = {base_techs}
+base_me = {base_me}
+base_ce = {base_ce}
+base_prog = {base_prog}
+techs_per_loc_input = {techs_per_loc_input}
+rent_per_loc = {rent_per_loc}
+central_cost = {central_cost}
+central_start_year = {central_start_year}
+sales_trigger = {sales_trigger}
+inflation_pct = {inflation_pct}
+        """
+        st.code(config_export, language='python')
